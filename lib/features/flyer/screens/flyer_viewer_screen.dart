@@ -1,7 +1,10 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../models/flyer_item.dart';
 import '../data/flyer_mock_data.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
+import '../widgets/deal_sheet.dart';
 
 class FlyerViewerScreen extends StatefulWidget {
   const FlyerViewerScreen({super.key});
@@ -30,6 +33,25 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   /// width / height of each flyer image, so the overlay can be sized to match
   /// the displayed artwork exactly (1024x1536 and 1033x1522).
   final List<double> _flyerAspects = [1024 / 1536, 1033 / 1522];
+
+  /// Decoded flyer images, used to crop real product photos for the deal sheet.
+  final List<ui.Image?> _flyerImages = [null, null];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFlyerImages();
+  }
+
+  Future<void> _loadFlyerImages() async {
+    for (int i = 0; i < _flyerPages.length; i++) {
+      final data = await rootBundle.load(_flyerPages[i]);
+      final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+      final frame = await codec.getNextFrame();
+      if (!mounted) return;
+      setState(() => _flyerImages[i] = frame.image);
+    }
+  }
 
   @override
   void dispose() {
@@ -173,152 +195,12 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [BoxShadow(blurRadius: 20, color: Colors.black26)],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.shopping_basket,
-                      color: Color(0xFF0071CE),
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        if (item.oldPrice != null)
-                          Text(
-                            'Was ${item.oldPrice}',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              decoration: TextDecoration.lineThrough,
-                              fontSize: 13,
-                            ),
-                          ),
-                        Text(
-                          item.price,
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: item.isRollback
-                                ? Colors.red
-                                : const Color(0xFF0071CE),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (item.isRollback)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFC220),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.arrow_downward,
-                            size: 12,
-                            color: Color(0xFF0071CE),
-                          ),
-                          SizedBox(width: 2),
-                          Text(
-                            'Rollback',
-                            style: TextStyle(
-                              color: Color(0xFF0071CE),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.shopping_cart_outlined),
-                      label: const Text('Buy Now'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF0071CE),
-                        side: const BorderSide(color: Color(0xFF0071CE)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.share, color: Colors.white),
-                      label: const Text(
-                        'Share deal',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0071CE),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+      // Transparent barrier: the flyer (and the yellow circle) stay in full
+      // colour behind the sheet instead of being greyed out.
+      barrierColor: Colors.transparent,
+      builder: (ctx) => DealSheet(
+        item: item,
+        flyerImage: _flyerImages[item.pageIndex],
       ),
     );
   }
