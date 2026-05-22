@@ -97,8 +97,9 @@ class HandDrawnCirclePainter extends CustomPainter {
     final double strokeW =
         (math.min(rx, ry) * 0.17).clamp(4.5, 12.0).toDouble();
 
-    // Reveal the stroke up to `progress`; reserve the tail for the arrowhead.
-    final double strokeFrac = (progress / 0.85).clamp(0.0, 1.0);
+    // Reveal the stroke up to `progress`. The loop already overshoots a full
+    // turn, so the marker just crosses itself at the top — no arrowhead.
+    final double strokeFrac = progress.clamp(0.0, 1.0);
     final metric = loop.computeMetrics().first;
     final Path drawn = metric.extractPath(0, metric.length * strokeFrac);
 
@@ -110,37 +111,6 @@ class HandDrawnCirclePainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
     canvas.drawPath(drawn, strokePaint);
-
-    // Arrowhead at the end of the stroke.
-    final double headT = ((progress - 0.80) / 0.20).clamp(0.0, 1.0);
-    if (headT > 0) {
-      final Offset tip = pointAt(1.0);
-      final Offset back = pointAt(0.955);
-      final Offset dir = tip - back;
-      final double dist = dir.distance;
-      if (dist > 0.001) {
-        final double ux = dir.dx / dist;
-        final double uy = dir.dy / dist;
-        final double px = -uy;
-        final double py = ux;
-        final double headLen = strokeW * 2.9 * headT;
-        final double headW = strokeW * 1.9 * headT;
-        final double bx = tip.dx - ux * headLen;
-        final double by = tip.dy - uy * headLen;
-        final Path arrow = Path()
-          ..moveTo(tip.dx, tip.dy)
-          ..lineTo(bx + px * headW, by + py * headW)
-          ..lineTo(bx - px * headW, by - py * headW)
-          ..close();
-        canvas.drawPath(
-          arrow,
-          Paint()
-            ..color = color
-            ..style = PaintingStyle.fill
-            ..isAntiAlias = true,
-        );
-      }
-    }
   }
 
   @override

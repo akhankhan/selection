@@ -194,6 +194,10 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   void _showItemBottomSheet(FlyerItem item) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      // The sheet drags itself (DraggableScrollableSheet), so the modal must
+      // not also handle drags.
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       // Transparent barrier: the flyer (and the yellow circle) stay in full
       // colour behind the sheet instead of being greyed out.
