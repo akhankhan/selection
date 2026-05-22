@@ -58,17 +58,33 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         );
     if (tapped == null) return;
 
-    // First tap on an item draws its circle; later taps just reopen the sheet.
-    if (!_highlightControllers.containsKey(tapped.id)) {
+    final AnimationController? existing = _highlightControllers[tapped.id];
+    if (existing == null) {
+      // Not circled yet: draw the circle and open the deal sheet.
       final controller = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 600),
       );
+      controller.addStatusListener((status) {
+        // Once the circle has fully un-drawn, drop it entirely.
+        if (status == AnimationStatus.dismissed && mounted) {
+          controller.dispose();
+          _highlightControllers.remove(tapped.id);
+          setState(() => _highlights.removeWhere((h) => h.id == tapped.id));
+        }
+      });
       _highlightControllers[tapped.id] = controller;
       setState(() => _highlights.add(tapped));
       controller.forward();
+      _showItemBottomSheet(tapped);
+    } else if (existing.status == AnimationStatus.reverse) {
+      // Mid-removal: tapping again brings the circle back.
+      existing.forward();
+      _showItemBottomSheet(tapped);
+    } else {
+      // Already circled: tapping again removes the circle.
+      existing.reverse();
     }
-    _showItemBottomSheet(tapped);
   }
 
   /// Builds the hand-drawn circle overlays for one page.
