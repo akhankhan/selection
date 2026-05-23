@@ -73,11 +73,11 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final double ny = localPosition.dy / imageSize.height;
 
     final FlyerItem? tapped = allFlyerItems.cast<FlyerItem?>().firstWhere(
-          (item) =>
-              item!.pageIndex == pageIndex &&
-              item.boundingBox.contains(Offset(nx, ny)),
-          orElse: () => null,
-        );
+      (item) =>
+          item!.pageIndex == pageIndex &&
+          item.boundingBox.contains(Offset(nx, ny)),
+      orElse: () => null,
+    );
     if (tapped == null) return;
 
     final AnimationController? existing = _highlightControllers[tapped.id];
@@ -111,9 +111,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
 
   /// Builds the hand-drawn circle overlays for one page.
   List<Widget> _buildHighlights(int pageIndex) {
-    return _highlights
-        .where((item) => item.pageIndex == pageIndex)
-        .map((item) {
+    return _highlights.where((item) => item.pageIndex == pageIndex).map((item) {
       final controller = _highlightControllers[item.id]!;
       return Positioned.fill(
         child: IgnorePointer(
@@ -198,14 +196,13 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       // The sheet drags itself (DraggableScrollableSheet), so the modal must
       // not also handle drags.
       enableDrag: false,
+
       backgroundColor: Colors.transparent,
       // Transparent barrier: the flyer (and the yellow circle) stay in full
       // colour behind the sheet instead of being greyed out.
       barrierColor: Colors.transparent,
-      builder: (ctx) => DealSheet(
-        item: item,
-        flyerImage: _flyerImages[item.pageIndex],
-      ),
+      builder: (ctx) =>
+          DealSheet(item: item, flyerImage: _flyerImages[item.pageIndex]),
     );
   }
 
