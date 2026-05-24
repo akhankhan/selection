@@ -1,5 +1,7 @@
 import 'dart:ui';
+import 'package:flutter/material.dart';
 import '../models/flyer_item.dart';
+import '../models/store.dart';
 
 // Bounding boxes are normalised (0..1) to the flyer image and were measured
 // from the real artwork: page 1 has a header ending at 0.112 and footer
@@ -201,3 +203,42 @@ final List<FlyerItem> page2Items = [
 ];
 
 final List<FlyerItem> allFlyerItems = [...page1Items, ...page2Items];
+
+final List<Store> stores = [
+  Store(
+    id: 'walmart',
+    name: 'Walmart',
+    dateRange: 'May 21 to May 27',
+    logoLetter: 'W',
+    brandColor: const Color(0xFF0071CE),
+    pages: [
+      FlyerPage(
+        imagePath: 'assets/flyers/flyer_page1.png',
+        aspectRatio: 1024 / 1536,
+        items: page1Items,
+      ),
+      FlyerPage(
+        imagePath: 'assets/flyers/flyer_page2.png',
+        aspectRatio: 1033 / 1522,
+        items: page2Items,
+      ),
+      const FlyerPage(
+        imagePath: 'assets/flyers/flyer_page3.png',
+        aspectRatio: 1536 / 1024,
+      ),
+    ],
+  ),
+  const Store(
+    id: 'petvalu',
+    name: 'Pet Valu',
+    dateRange: 'May 14 to May 27',
+    logoLetter: 'P',
+    brandColor: Color(0xFF1F2A36),
+    pages: [
+      FlyerPage(
+        imagePath: 'assets/pet/pet_image.png',
+        aspectRatio: 954 / 1648,
+      ),
+    ],
+  ),
+];
