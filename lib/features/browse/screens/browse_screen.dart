@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../flyer/data/flyer_mock_data.dart';
 import '../../flyer/screens/flyer_viewer_screen.dart';
+import '../../lists/screens/lists_screen.dart';
 import '../widgets/store_card.dart';
 
 class BrowseScreen extends StatefulWidget {
@@ -358,7 +359,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Widget _buildBottomNav() {
     return BottomNavigationBar(
       currentIndex: _bottomNavIndex,
-      onTap: (i) => setState(() => _bottomNavIndex = i),
+      onTap: (i) {
+        if (i == 2) {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ListsScreen()),
+          );
+        } else {
+          setState(() => _bottomNavIndex = i);
+        }
+      },
       type: BottomNavigationBarType.fixed,
       backgroundColor: Colors.white,
       selectedItemColor: _brandBlue,

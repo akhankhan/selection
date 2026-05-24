@@ -11,6 +11,7 @@ class ListItem {
     this.subtitle,
     this.qty = 1,
     this.checked = false,
+    this.flyerItemId,
   });
 
   final String name;
@@ -22,6 +23,7 @@ class ListItem {
   final String? subtitle;
   int qty;
   bool checked;
+  final String? flyerItemId;
 }
 
 class ListSection {

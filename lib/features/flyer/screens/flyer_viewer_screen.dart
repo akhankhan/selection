@@ -7,6 +7,7 @@ import '../data/flyer_mock_data.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
 import '../../lists/screens/lists_screen.dart';
+import '../../lists/models/shopping_list_manager.dart';
 
 class FlyerViewerScreen extends StatefulWidget {
   final int initialStoreIndex;
@@ -51,6 +52,72 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     _scrollControllers =
         List.generate(stores.length, (_) => ScrollController());
     _loadFlyerImages();
+
+    // Add shopping list listener
+    ShoppingListManager().addListener(_onShoppingListChanged);
+    _syncHighlights();
+  }
+
+  void _onShoppingListChanged() {
+    if (mounted) {
+      setState(() {
+        _syncHighlights();
+      });
+    }
+  }
+
+  void _syncHighlights() {
+    final store = stores[_currentStore];
+    final manager = ShoppingListManager();
+
+    final Set<String> activeIds = {};
+    for (final page in store.pages) {
+      for (final item in page.items) {
+        if (manager.hasFlyerItem(item.id, store.name)) {
+          activeIds.add(item.id);
+        }
+      }
+    }
+
+    // Add missing highlights
+    for (final page in store.pages) {
+      for (final item in page.items) {
+        if (activeIds.contains(item.id) && !_highlights.any((h) => h.id == item.id)) {
+          _highlights.add(item);
+          final controller = AnimationController(
+            vsync: this,
+            duration: const Duration(milliseconds: 600),
+          );
+          controller.addStatusListener((status) {
+            if (status == AnimationStatus.dismissed && mounted) {
+              controller.dispose();
+              _highlightControllers.remove(item.id);
+              setState(() => _highlights.removeWhere((h) => h.id == item.id));
+              manager.removeFlyerItem(item.id, store.name);
+            }
+          });
+          _highlightControllers[item.id] = controller;
+          controller.value = 1.0; // fully drawn circle
+        }
+      }
+    }
+
+    // Remove obsolete highlights
+    final List<String> toRemove = [];
+    for (final h in _highlights) {
+      if (!activeIds.contains(h.id)) {
+        toRemove.add(h.id);
+      }
+    }
+
+    for (final id in toRemove) {
+      final controller = _highlightControllers[id];
+      if (controller != null) {
+        controller.dispose();
+        _highlightControllers.remove(id);
+      }
+      _highlights.removeWhere((h) => h.id == id);
+    }
   }
 
   Future<void> _loadFlyerImages() async {
@@ -67,6 +134,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
 
   @override
   void dispose() {
+    ShoppingListManager().removeListener(_onShoppingListChanged);
     _storeController.dispose();
     for (final c in _scrollControllers) {
       c.dispose();
@@ -94,6 +162,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     );
     if (tapped == null) return;
 
+    final store = stores[storeIdx];
+    final manager = ShoppingListManager();
+
     final AnimationController? existing = _highlightControllers[tapped.id];
     if (existing == null) {
       // Not circled yet: draw the circle and open the deal sheet.
@@ -107,14 +178,20 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           controller.dispose();
           _highlightControllers.remove(tapped.id);
           setState(() => _highlights.removeWhere((h) => h.id == tapped.id));
+          manager.removeFlyerItem(tapped.id, store.name);
         }
       });
       _highlightControllers[tapped.id] = controller;
       setState(() => _highlights.add(tapped));
       controller.forward();
+
+      // Add to shopping list
+      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imagePath]);
+
       _showItemBottomSheet(tapped, page.imagePath);
     } else if (existing.status == AnimationStatus.reverse) {
       existing.forward();
+      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imagePath]);
       _showItemBottomSheet(tapped, page.imagePath);
     } else {
       existing.reverse();
@@ -319,6 +396,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           // page indicator. The scroll listener will update as the user
           // scrolls within the new store.
           _currentPage = 0;
+          _syncHighlights();
         });
       },
       itemBuilder: (context, storeIdx) => _buildStoreScroll(storeIdx),
@@ -379,6 +457,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   @override
   Widget build(BuildContext context) {
     final Store store = _activeStore;
+    final int listCount = ShoppingListManager().totalItemCount;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -395,11 +475,25 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             icon: const Icon(Icons.share_outlined, color: Colors.black54),
             onPressed: null,
           ),
-          Badge(
-            label: const Text('3'),
-            backgroundColor: Colors.red,
-            offset: const Offset(-4, 4),
-            child: IconButton(
+          if (listCount > 0)
+            Badge(
+              label: Text('$listCount'),
+              backgroundColor: Colors.red,
+              offset: const Offset(-4, 4),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.calendar_today_outlined,
+                  color: Colors.black54,
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ListsScreen()),
+                  );
+                },
+              ),
+            )
+          else
+            IconButton(
               icon: const Icon(
                 Icons.calendar_today_outlined,
                 color: Colors.black54,
@@ -410,7 +504,6 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
                 );
               },
             ),
-          ),
           IconButton(
             icon: const Icon(Icons.favorite_border, color: Colors.red),
             onPressed: null,

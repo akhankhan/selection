@@ -5,9 +5,11 @@ class AddItemInput extends StatefulWidget {
     super.key,
     required this.lists,
     required this.onSubmit,
+    this.initialList,
   });
 
   final List<String> lists;
+  final String? initialList;
   final void Function(String item, String list) onSubmit;
 
   @override
@@ -17,11 +19,12 @@ class AddItemInput extends StatefulWidget {
 class _AddItemInputState extends State<AddItemInput> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  late String _selectedList = widget.lists.first;
+  late String _selectedList;
 
   @override
   void initState() {
     super.initState();
+    _selectedList = widget.initialList ?? widget.lists.first;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
@@ -50,7 +53,7 @@ class _AddItemInputState extends State<AddItemInput> {
             border: Border.all(color: const Color(0xFF0071CE), width: 1.5),
             borderRadius: BorderRadius.circular(6),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
           child: Row(
             children: [
               Expanded(
@@ -91,6 +94,22 @@ class _AddItemInputState extends State<AddItemInput> {
                   },
                 ),
               ),
+              const SizedBox(width: 6),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.add_circle,
+                  color: Color(0xFF0071CE),
+                  size: 32,
+                ),
+                onPressed: () {
+                  final value = _controller.text;
+                  if (value.trim().isEmpty) return;
+                  widget.onSubmit(value.trim(), _selectedList);
+                  Navigator.of(context).pop();
+                },
+              ),
             ],
           ),
         ),
@@ -102,12 +121,17 @@ class _AddItemInputState extends State<AddItemInput> {
 Future<void> showAddItemInput(
   BuildContext context, {
   required List<String> lists,
+  String? initialList,
   required void Function(String item, String list) onSubmit,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => AddItemInput(lists: lists, onSubmit: onSubmit),
+    builder: (_) => AddItemInput(
+      lists: lists,
+      initialList: initialList,
+      onSubmit: onSubmit,
+    ),
   );
 }
