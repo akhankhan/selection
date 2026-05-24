@@ -8,7 +8,8 @@ import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
 
 class FlyerViewerScreen extends StatefulWidget {
-  const FlyerViewerScreen({super.key});
+  final int initialStoreIndex;
+  const FlyerViewerScreen({super.key, this.initialStoreIndex = 0});
 
   @override
   State<FlyerViewerScreen> createState() => _FlyerViewerScreenState();
@@ -43,7 +44,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   @override
   void initState() {
     super.initState();
-    _storeController = PageController();
+    _currentStore =
+        widget.initialStoreIndex.clamp(0, stores.length - 1).toInt();
+    _storeController = PageController(initialPage: _currentStore);
     _scrollControllers =
         List.generate(stores.length, (_) => ScrollController());
     _loadFlyerImages();

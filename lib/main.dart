@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'features/flyer/screens/flyer_viewer_screen.dart';
+import 'features/browse/screens/browse_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const FlyerViewerScreen(),
+      home: const BrowseScreen(),
     );
   }
 }
