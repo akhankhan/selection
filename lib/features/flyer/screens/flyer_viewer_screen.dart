@@ -404,8 +404,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   }
 
   Widget _buildDotPill() {
-    if (_activeTab != _Tab.weeklyAd) return const SizedBox.shrink();
-    final int pageCount = _activeStore.pages.length;
+    final int storeCount = stores.length;
+    if (storeCount <= 1) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -421,8 +422,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: List.generate(pageCount, (i) {
-          final bool active = i == _currentPage;
+        children: List.generate(storeCount, (i) {
+          final bool active = i == _currentStore;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             margin: const EdgeInsets.symmetric(horizontal: 4),
