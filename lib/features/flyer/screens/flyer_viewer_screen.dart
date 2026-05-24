@@ -6,6 +6,7 @@ import '../models/store.dart';
 import '../data/flyer_mock_data.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
+import '../../lists/screens/lists_screen.dart';
 
 class FlyerViewerScreen extends StatefulWidget {
   final int initialStoreIndex;
@@ -403,7 +404,11 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
                 Icons.calendar_today_outlined,
                 color: Colors.black54,
               ),
-              onPressed: null,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ListsScreen()),
+                );
+              },
             ),
           ),
           IconButton(
