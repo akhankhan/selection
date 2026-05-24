@@ -25,14 +25,14 @@ class ShareListSheet extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               const Text(
                 'Sign in to share your list',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
                 ),
               ),
               const SizedBox(height: 12),
@@ -41,11 +41,11 @@ class ShareListSheet extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.black87,
+                  color: Color(0xFF5F6368),
                   height: 1.35,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               _HandsIllustration(),
               const SizedBox(height: 18),
               InkWell(
@@ -192,72 +192,250 @@ class _FacebookIcon extends StatelessWidget {
 class _GoogleIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Text(
-      'G',
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.w900,
-        color: Color(0xFF4285F4),
-        height: 1,
-      ),
+    return CustomPaint(
+      size: const Size(20, 20),
+      painter: _GoogleIconPainter(),
     );
   }
+}
+
+class _GoogleIconPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double r = size.width / 2;
+    final Rect rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    
+    final Paint redPaint = Paint()..color = const Color(0xFFEA4335);
+    final Paint greenPaint = Paint()..color = const Color(0xFF34A853);
+    final Paint yellowPaint = Paint()..color = const Color(0xFFFBBC05);
+    final Paint bluePaint = Paint()..color = const Color(0xFF4285F4);
+    
+    final double sw = size.width * 0.22; // Stroke width
+    
+    // Red Arc (top segment)
+    canvas.drawArc(
+      rect.deflate(sw / 2),
+      -2.4, // angle start
+      1.3, // sweep
+      false,
+      redPaint..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.square,
+    );
+    
+    // Green Arc (bottom segment)
+    canvas.drawArc(
+      rect.deflate(sw / 2),
+      0.6,
+      1.3,
+      false,
+      greenPaint..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.square,
+    );
+    
+    // Yellow Arc (left segment)
+    canvas.drawArc(
+      rect.deflate(sw / 2),
+      1.9,
+      1.2,
+      false,
+      yellowPaint..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.square,
+    );
+    
+    // Blue Arc + Bar (right segment and center bar)
+    canvas.drawArc(
+      rect.deflate(sw / 2),
+      -1.1,
+      1.7,
+      false,
+      bluePaint..style = PaintingStyle.stroke..strokeWidth = sw..strokeCap = StrokeCap.square,
+    );
+    
+    // Center horizontal bar for "G"
+    final Paint blueFill = Paint()..color = const Color(0xFF4285F4)..style = PaintingStyle.fill;
+    canvas.drawRect(
+      Rect.fromLTWH(r, r - sw / 2, r * 0.9, sw),
+      blueFill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _HandsIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 160,
-            height: 110,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF3FB),
-              borderRadius: BorderRadius.circular(80),
-            ),
-          ),
-          Positioned(
-            left: 60,
-            top: 20,
-            child: Transform.rotate(
-              angle: -0.3,
-              child: const Icon(
-                Icons.back_hand_outlined,
-                size: 56,
-                color: Color(0xFFE6A98C),
-              ),
-            ),
-          ),
-          Positioned(
-            right: 60,
-            bottom: 20,
-            child: Transform.rotate(
-              angle: 2.8,
-              child: const Icon(
-                Icons.back_hand_outlined,
-                size: 56,
-                color: Color(0xFFE6A98C),
-              ),
-            ),
-          ),
-          Container(
-            width: 36,
-            height: 28,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: const Color(0xFF0071CE), width: 1.5),
-            ),
-            child: const Icon(Icons.check, size: 18, color: Color(0xFF0071CE)),
-          ),
-        ],
+      width: 200,
+      height: 140,
+      child: CustomPaint(
+        size: const Size(200, 140),
+        painter: _HandsIllustrationPainter(),
       ),
     );
   }
+}
+
+class _HandsIllustrationPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    
+    // 1. Draw soft blue oval background
+    final Paint bgPaint = Paint()
+      ..color = const Color(0xFFF0F5FA)
+      ..style = PaintingStyle.fill;
+    canvas.drawOval(Rect.fromLTWH(0, 0, w, h), bgPaint);
+    
+    // 2. Draw shopping list sheet (tilted white card in the center)
+    final Paint cardPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final Paint cardShadow = Paint()
+      ..color = const Color(0x10000000)
+      ..style = PaintingStyle.fill;
+    
+    // Shadow rect
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.23, h * 0.16, w * 0.54, h * 0.70), const Radius.circular(8)),
+      cardShadow,
+    );
+    // Real sheet rect
+    final RRect sheetRRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.25, h * 0.14, w * 0.50, h * 0.68),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(sheetRRect, cardPaint);
+    
+    // Draw thin blue border around the sheet
+    final Paint borderPaint = Paint()
+      ..color = const Color(0xFFD8E5F3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawRRect(sheetRRect, borderPaint);
+    
+    // 3. Draw lines and checkboxes on the sheet
+    final Paint linePaint = Paint()
+      ..color = const Color(0xFFE6EFF9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    
+    final Paint checkPaint = Paint()
+      ..color = const Color(0xFF4FA0F9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+      
+    final Paint checkedBg = Paint()
+      ..color = const Color(0xFFE8F1FC)
+      ..style = PaintingStyle.fill;
+
+    // Checkbox 1 (Checked)
+    final double cb1Top = h * 0.24;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.32, cb1Top, 15, 11), const Radius.circular(2)),
+      checkedBg,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.32, cb1Top, 15, 11), const Radius.circular(2)),
+      checkPaint,
+    );
+    // Draw check mark
+    final Path checkPath = Path()
+      ..moveTo(w * 0.32 + 3, cb1Top + 5)
+      ..lineTo(w * 0.32 + 6, cb1Top + 8)
+      ..lineTo(w * 0.32 + 11, cb1Top + 3);
+    canvas.drawPath(checkPath, Paint()
+      ..color = const Color(0xFF0071CE)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8);
+
+    // Lines for item 1
+    canvas.drawLine(Offset(w * 0.44, cb1Top + 5), Offset(w * 0.68, cb1Top + 5), linePaint);
+    
+    // Checkbox 2 (Checked)
+    final double cb2Top = h * 0.42;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.32, cb2Top, 15, 11), const Radius.circular(2)),
+      checkedBg,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.32, cb2Top, 15, 11), const Radius.circular(2)),
+      checkPaint,
+    );
+    // Draw check mark
+    final Path checkPath2 = Path()
+      ..moveTo(w * 0.32 + 3, cb2Top + 5)
+      ..lineTo(w * 0.32 + 6, cb2Top + 8)
+      ..lineTo(w * 0.32 + 11, cb2Top + 3);
+    canvas.drawPath(checkPath2, Paint()
+      ..color = const Color(0xFF0071CE)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8);
+    // Lines for item 2
+    canvas.drawLine(Offset(w * 0.44, cb2Top + 5), Offset(w * 0.62, cb2Top + 5), linePaint);
+    
+    // Checkbox 3 (Unchecked)
+    final double cb3Top = h * 0.60;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.32, cb3Top, 15, 11), const Radius.circular(2)),
+      checkPaint,
+    );
+    // Lines for item 3
+    canvas.drawLine(Offset(w * 0.44, cb3Top + 5), Offset(w * 0.58, cb3Top + 5), linePaint);
+    
+    // 4. Draw Left Hand (Sleeve, Watch, Hand pointing to Checkbox 1)
+    final Paint skinPaint = Paint()..color = const Color(0xFFFCBEA1);
+    final Paint watchPaint = Paint()..color = const Color(0xFF6B7A82);
+    final Paint sleevePaint1 = Paint()..color = const Color(0xFFED836F); // Peach-red sleeve
+
+    // Left Arm/Sleeve
+    final Path sleevePath1 = Path()
+      ..moveTo(0, h * 0.38)
+      ..lineTo(w * 0.16, h * 0.30)
+      ..lineTo(w * 0.22, h * 0.48)
+      ..lineTo(w * 0.05, h * 0.56)
+      ..close();
+    canvas.drawPath(sleevePath1, sleevePaint1);
+    
+    // Watch
+    canvas.drawOval(Rect.fromLTWH(w * 0.13, h * 0.38, 10, 8), watchPaint);
+    
+    // Left Hand pointing finger
+    final Path handPath1 = Path()
+      ..moveTo(w * 0.16, h * 0.38)
+      ..quadraticBezierTo(w * 0.22, h * 0.40, w * 0.32, h * 0.46) // Pointing finger
+      ..lineTo(w * 0.34, h * 0.48)
+      ..quadraticBezierTo(w * 0.36, h * 0.50, w * 0.34, h * 0.52)
+      ..lineTo(w * 0.24, h * 0.54)
+      ..lineTo(w * 0.18, h * 0.46)
+      ..close();
+    canvas.drawPath(handPath1, skinPaint);
+    
+    // 5. Draw Right Hand (pointing to Checkbox 2)
+    final Paint sleevePaint2 = Paint()..color = const Color(0xFFED836F); // Reddish sleeve
+    
+    // Right Arm/Sleeve
+    final Path sleevePath2 = Path()
+      ..moveTo(w, h * 0.48)
+      ..lineTo(w * 0.84, h * 0.42)
+      ..lineTo(w * 0.78, h * 0.60)
+      ..lineTo(w * 0.94, h * 0.66)
+      ..close();
+    canvas.drawPath(sleevePath2, sleevePaint2);
+    
+    // Right Hand pointing finger
+    final Path handPath2 = Path()
+      ..moveTo(w * 0.84, h * 0.50)
+      ..quadraticBezierTo(w * 0.78, h * 0.52, w * 0.68, h * 0.58) // Pointing finger
+      ..lineTo(w * 0.66, h * 0.60)
+      ..quadraticBezierTo(w * 0.64, h * 0.62, w * 0.66, h * 0.64)
+      ..lineTo(w * 0.74, h * 0.66)
+      ..lineTo(w * 0.80, h * 0.58)
+      ..close();
+    canvas.drawPath(handPath2, skinPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _TermsText extends StatelessWidget {

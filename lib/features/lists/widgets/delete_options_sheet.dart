@@ -40,38 +40,35 @@ class DeleteOptionsSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 8, 16),
+            padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
               children: [
+                const SizedBox(width: 48), // Offsets the close button for perfect centering
                 const Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(left: 40),
-                      child: Text(
-                        'Delete options',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
+                  child: Text(
+                    'Delete options',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
                     ),
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Colors.black87),
+                  icon: const Icon(Icons.close, color: Color(0xFF5F6368)),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
           _buildOption(context, 'Delete all expired items', onDeleteExpired),
-          const Divider(height: 1, indent: 16, endIndent: 16),
+          const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
           _buildOption(context, 'Delete checked items', onDeleteChecked),
-          const Divider(height: 1, indent: 16, endIndent: 16),
+          const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
           _buildOption(context, 'Delete all items', onDeleteAll),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -85,11 +82,15 @@ class DeleteOptionsSheet extends StatelessWidget {
       },
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         alignment: Alignment.centerLeft,
         child: Text(
           label,
-          style: const TextStyle(fontSize: 15, color: Colors.black87),
+          style: const TextStyle(
+            fontSize: 16,
+            color: Color(0xFF1E293B),
+            fontWeight: FontWeight.w400,
+          ),
         ),
       ),
     );
