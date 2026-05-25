@@ -63,6 +63,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '699002286605',
     projectId: 'selection-admin',
     storageBucket: 'selection-admin.firebasestorage.app',
+    androidClientId: '699002286605-9ms8hsbev6mfbd5ss724rmai84bk4ikn.apps.googleusercontent.com',
+    iosClientId: '699002286605-6oa40u9chkn6qgggn2k8pc6tb79di8vq.apps.googleusercontent.com',
     iosBundleId: 'com.example.selection',
   );
+
 }

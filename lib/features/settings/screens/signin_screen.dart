@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class SignInScreen extends StatelessWidget {
-  const SignInScreen({super.key});
+  SignInScreen({super.key});
+
+  final ValueNotifier<bool> _isLoading = ValueNotifier(false);
 
   static const Color _brandBlue = Color(0xFF0071CE);
   static const Color _navyDark = Color(0xFF1E293B);
@@ -24,7 +28,12 @@ class SignInScreen extends StatelessWidget {
               ),
             ),
             // Bottom Sheet Container
-            Container(
+            ValueListenableBuilder<bool>(
+              valueListenable: _isLoading,
+              builder: (context, isLoading, child) {
+                return Stack(
+                  children: [
+                    Container(
               width: double.infinity,
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -187,11 +196,31 @@ class SignInScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (isLoading)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: _brandBlue,
+                    ),
+                  ),
+                ),
+              ),
           ],
-        ),
-      ),
-    );
-  }
+        );
+      },
+    ),
+  ],
+),
+),
+);
+}
 
   Widget _buildFlyersRow() {
     return SizedBox(
@@ -431,16 +460,10 @@ class SignInScreen extends StatelessWidget {
           child: Row(
             children: [
               if (iconImage == 'google')
-                // Simulated Google colorful Logo
-                Row(
-                  children: [
-                    Container(
-                      width: 18,
-                      height: 18,
-                      decoration: const BoxDecoration(shape: BoxShape.circle),
-                      child: CustomPaint(painter: GoogleLogoPainter()),
-                    ),
-                  ],
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CustomPaint(painter: GoogleLogoPainter()),
                 )
               else
                 Icon(icon, color: iconColor, size: 22),
@@ -462,65 +485,163 @@ class SignInScreen extends StatelessWidget {
     );
   }
 
-  void _handleLogin(BuildContext context, String provider) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Logging in with $provider...'),
-        backgroundColor: _brandBlue,
-      ),
-    );
-    Future.delayed(const Duration(seconds: 1), () {
+  void _handleLogin(BuildContext context, String provider) async {
+    if (provider != 'Google') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Logging in with $provider...'),
+          backgroundColor: _brandBlue,
+        ),
+      );
+      Future.delayed(const Duration(seconds: 1), () {
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Successfully signed in with $provider!'),
+              backgroundColor: const Color(0xFF2E7D32),
+            ),
+          );
+        }
+      });
+      return;
+    }
+
+    // Google Sign-In Flow
+    _isLoading.value = true;
+    debugPrint('[Google Sign-In] Triggering GoogleSignIn.instance.authenticate()...');
+
+    try {
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      debugPrint('[Google Sign-In] Authentication successful! User email: ${googleUser.email}');
+
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+      
+      debugPrint('[Google Sign-In] Retreived ID Token: ${idToken != null ? "SUCCESS (length: ${idToken.length})" : "NULL"}');
+      if (idToken == null) {
+        throw Exception('Failed to retrieve Google ID Token.');
+      }
+
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        idToken: idToken,
+      );
+
+      debugPrint('[Google Sign-In] Signing into Firebase with credential...');
+      final UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      debugPrint('[Google Sign-In] Firebase Sign-In successful! User: ${userCredential.user?.displayName} (${userCredential.user?.email})');
+
+      _isLoading.value = false;
+
       if (context.mounted) {
-        Navigator.pop(context);
+        Navigator.pop(context); // Dismiss SignInScreen bottom sheet
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Successfully signed in with $provider!'),
+            content: Text(
+              'Successfully signed in as ${userCredential.user?.displayName ?? "User"}!',
+            ),
             backgroundColor: const Color(0xFF2E7D32),
           ),
         );
       }
-    });
+    } catch (e) {
+      _isLoading.value = false;
+      debugPrint('[Google Sign-In ERROR] Exception occurred during authentication flow: $e');
+      debugPrint('[Google Sign-In ERROR] NOTE: If you get "No credentials available", you MUST add a Google account to your Android emulator settings (Settings -> Passwords & Accounts -> Add Account -> Google).');
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In failed: ${e.toString()}'),
+            backgroundColor: Colors.red[800],
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      }
+    }
   }
 }
 
-// Custom Painter to draw Google color wheel G logo
+// Custom Painter to draw mathematically accurate Google "G" vector logo
 class GoogleLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
+    final double scaleX = size.width / 24.0;
+    final double scaleY = size.height / 24.0;
+    canvas.save();
+    canvas.scale(scaleX, scaleY);
 
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.5;
-
-    // Red sector
-    paint.color = const Color(0xFFEA4335);
-    canvas.drawArc(rect, 3.14 + 0.35, 1.8, false, paint);
-
-    // Yellow sector
-    paint.color = const Color(0xFFFBBC05);
-    canvas.drawArc(rect, 1.1, 1.1, false, paint);
-
-    // Green sector
-    paint.color = const Color(0xFF34A853);
-    canvas.drawArc(rect, 0.0, 1.1, false, paint);
-
-    // Blue sector
-    paint.color = const Color(0xFF4285F4);
-    canvas.drawArc(rect, 4.5, 1.8, false, paint);
-
-    // Draw horizontal bar inside G
-    final barPaint = Paint()
+    // Blue Path (#4285F4)
+    final Paint bluePaint = Paint()
       ..color = const Color(0xFF4285F4)
-      ..strokeWidth = 3.5
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-      Offset(center.dx, center.dy),
-      Offset(center.dx + radius - 1, center.dy),
-      barPaint,
-    );
+      ..style = PaintingStyle.fill;
+    final Path bluePath = Path()
+      ..moveTo(22.56, 12.25)
+      ..relativeCubicTo(0.0, -0.78, -0.07, -1.53, -0.2, -2.25)
+      ..lineTo(12.0, 10.0)
+      ..relativeLineTo(0.0, 4.26)
+      ..relativeLineTo(5.92, 0.0)
+      ..relativeCubicTo(-0.26, 1.37, -1.04, 2.53, -2.21, 3.31)
+      ..relativeLineTo(0.0, 2.77)
+      ..relativeLineTo(3.57, 0.0)
+      ..relativeCubicTo(2.08, -1.92, 3.28, -4.74, 3.28, -8.09)
+      ..close();
+    canvas.drawPath(bluePath, bluePaint);
+
+    // Green Path (#34A853)
+    final Paint greenPaint = Paint()
+      ..color = const Color(0xFF34A853)
+      ..style = PaintingStyle.fill;
+    final Path greenPath = Path()
+      ..moveTo(12.0, 23.0)
+      ..relativeCubicTo(2.97, 0.0, 5.46, -0.98, 7.28, -2.66)
+      ..relativeLineTo(-3.57, -2.77)
+      ..relativeCubicTo(-0.98, 0.66, -2.23, 1.06, -3.71, 1.06)
+      ..relativeCubicTo(-2.86, 0.0, -5.29, -1.93, -6.16, -4.53)
+      ..lineTo(2.18, 14.1)
+      ..relativeLineTo(0.0, 2.84)
+      ..cubicTo(3.99, 20.53, 7.7, 23.0, 12.0, 23.0)
+      ..close();
+    canvas.drawPath(greenPath, greenPaint);
+
+    // Yellow Path (#FBBC05)
+    final Paint yellowPaint = Paint()
+      ..color = const Color(0xFFFBBC05)
+      ..style = PaintingStyle.fill;
+    final Path yellowPath = Path()
+      ..moveTo(5.84, 14.09)
+      ..relativeCubicTo(-0.22, -0.66, -0.35, -1.36, -0.35, -2.09)
+      ..relativeCubicTo(0.0, -0.73, 0.13, -1.43, 0.35, -2.09)
+      ..lineTo(5.84, 7.06)
+      ..lineTo(2.18, 7.06)
+      ..cubicTo(1.43, 8.55, 1.0, 10.22, 1.0, 12.0)
+      ..cubicTo(1.0, 13.78, 1.43, 15.45, 2.18, 16.94)
+      ..relativeLineTo(2.85, -2.22)
+      ..relativeLineTo(0.81, -0.63)
+      ..close();
+    canvas.drawPath(yellowPath, yellowPaint);
+
+    // Red Path (#EA4335)
+    final Paint redPaint = Paint()
+      ..color = const Color(0xFFEA4335)
+      ..style = PaintingStyle.fill;
+    final Path redPath = Path()
+      ..moveTo(12.0, 5.38)
+      ..relativeCubicTo(1.62, 0.0, 3.06, 0.56, 4.21, 1.64)
+      ..relativeLineTo(3.15, -3.15)
+      ..cubicTo(17.45, 2.09, 14.97, 1.0, 12.0, 1.0)
+      ..cubicTo(7.7, 1.0, 3.99, 3.47, 2.18, 7.06)
+      ..relativeLineTo(3.66, 2.84)
+      ..relativeCubicTo(0.87, -2.6, 3.3, -4.52, 6.16, -4.52)
+      ..close();
+    canvas.drawPath(redPath, redPaint);
+
+    canvas.restore();
   }
 
   @override

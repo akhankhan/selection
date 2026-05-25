@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'signin_screen.dart';
 import 'privacy_choices_screen.dart';
 
@@ -221,27 +223,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         children: [
           // My Account Section
-          _buildCategoryHeader('My Account'),
-          _buildTile(
-            title: 'Sign In or Create Account',
-            onTap: () {
-              Navigator.of(context).push(
-                PageRouteBuilder(
-                  opaque: false,
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      const SignInScreen(),
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        return SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0.0, 1.0),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: child,
+          StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              if (user == null) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCategoryHeader('My Account'),
+                    _buildTile(
+                      title: 'Sign In or Create Account',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          PageRouteBuilder(
+                            opaque: false,
+                            pageBuilder:
+                                (context, animation, secondaryAnimation) =>
+                                    SignInScreen(),
+                            transitionsBuilder: (
+                              context,
+                              animation,
+                              secondaryAnimation,
+                              child,
+                            ) {
+                              return SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0.0, 1.0),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              );
+                            },
+                          ),
                         );
                       },
-                ),
-              );
+                    ),
+                  ],
+                );
+              } else {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCategoryHeader('My Account'),
+                    Material(
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 24,
+                              backgroundColor: _brandBlue.withValues(
+                                alpha: 0.1,
+                              ),
+                              backgroundImage: user.photoURL != null
+                                  ? NetworkImage(user.photoURL!)
+                                  : null,
+                              child: user.photoURL == null
+                                  ? Text(
+                                      (user.displayName ??
+                                          user.email ??
+                                          'U')[0]
+                                          .toUpperCase(),
+                                      style: const TextStyle(
+                                        color: _brandBlue,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    user.displayName ?? 'User',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user.email ?? '',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    _buildDivider(),
+                    _buildTile(
+                      title: 'Sign Out',
+                      subtitle: 'Sign out of your Flipp account',
+                      onTap: () async {
+                        await FirebaseAuth.instance.signOut();
+                        try {
+                          await GoogleSignIn.instance.signOut();
+                        } catch (e) {
+                          debugPrint('Google Sign In sign out error: $e');
+                        }
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Successfully signed out!'),
+                              backgroundColor: _brandBlue,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                );
+              }
             },
           ),
 
