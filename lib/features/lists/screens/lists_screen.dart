@@ -92,7 +92,11 @@ class _ListsScreenState extends State<ListsScreen> {
             onPressed: _openDeleteOptions,
           ),
           IconButton(
-            icon: const Icon(Icons.person_add_alt_1, color: Color(0xFF0071CE), size: 26),
+            icon: const Icon(
+              Icons.person_add_alt_1,
+              color: Color(0xFF0071CE),
+              size: 26,
+            ),
             onPressed: _openShareSheet,
           ),
         ],
@@ -108,7 +112,10 @@ class _ListsScreenState extends State<ListsScreen> {
 
   List<Widget> _buildSection(ListSection section) {
     return [
-      _SectionHeader(title: section.title, onAdd: () => _openAddItem(section.title)),
+      _SectionHeader(
+        title: section.title,
+        onAdd: () => _openAddItem(section.title),
+      ),
       for (final item in section.items)
         _ItemRow(
           item: item,
@@ -188,7 +195,10 @@ class _ItemRow extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: _CustomCheckbox(value: item.checked, onChanged: onCheckChanged),
+                child: _CustomCheckbox(
+                  value: item.checked,
+                  onChanged: onCheckChanged,
+                ),
               ),
               const SizedBox(width: 12),
               item.thumbnail,
@@ -203,7 +213,9 @@ class _ItemRow extends StatelessWidget {
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: item.checked ? Colors.black38 : Colors.black,
-                        decoration: item.checked ? TextDecoration.lineThrough : TextDecoration.none,
+                        decoration: item.checked
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
                         height: 1.25,
                       ),
                     ),

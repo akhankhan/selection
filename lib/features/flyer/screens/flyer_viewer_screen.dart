@@ -1,17 +1,21 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import '../models/flyer_item.dart';
 import '../models/store.dart';
-import '../data/flyer_mock_data.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
 
 class FlyerViewerScreen extends StatefulWidget {
+  final List<Store> stores;
   final int initialStoreIndex;
-  const FlyerViewerScreen({super.key, this.initialStoreIndex = 0});
+  const FlyerViewerScreen({
+    super.key,
+    required this.stores,
+    this.initialStoreIndex = 0,
+  });
 
   @override
   State<FlyerViewerScreen> createState() => _FlyerViewerScreenState();
@@ -33,7 +37,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   /// One draw-on animation controller per highlighted item.
   final Map<String, AnimationController> _highlightControllers = {};
 
-  /// Decoded flyer images keyed by asset path, used to crop real product
+  /// Decoded flyer images keyed by image URL, used to crop real product
   /// photos for the deal sheet.
   final Map<String, ui.Image> _flyerImages = {};
 
@@ -41,16 +45,20 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   static const double _tabBarHeight = 48;
   static const double _tabBarBottomSpace = 12;
 
-  Store get _activeStore => stores[_currentStore];
+  List<Store> get _stores => widget.stores;
+  Store get _activeStore => _stores[_currentStore];
 
   @override
   void initState() {
     super.initState();
-    _currentStore =
-        widget.initialStoreIndex.clamp(0, stores.length - 1).toInt();
+    _currentStore = widget.initialStoreIndex
+        .clamp(0, _stores.length - 1)
+        .toInt();
     _storeController = PageController(initialPage: _currentStore);
-    _scrollControllers =
-        List.generate(stores.length, (_) => ScrollController());
+    _scrollControllers = List.generate(
+      _stores.length,
+      (_) => ScrollController(),
+    );
     _loadFlyerImages();
 
     // Add shopping list listener
@@ -67,7 +75,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   }
 
   void _syncHighlights() {
-    final store = stores[_currentStore];
+    final store = _stores[_currentStore];
     final manager = ShoppingListManager();
 
     final Set<String> activeIds = {};
@@ -82,7 +90,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     // Add missing highlights
     for (final page in store.pages) {
       for (final item in page.items) {
-        if (activeIds.contains(item.id) && !_highlights.any((h) => h.id == item.id)) {
+        if (activeIds.contains(item.id) &&
+            !_highlights.any((h) => h.id == item.id)) {
           _highlights.add(item);
           final controller = AnimationController(
             vsync: this,
@@ -121,13 +130,21 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   }
 
   Future<void> _loadFlyerImages() async {
-    for (final store in stores) {
+    for (final store in _stores) {
       for (final page in store.pages) {
-        final data = await rootBundle.load(page.imagePath);
-        final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-        final frame = await codec.getNextFrame();
-        if (!mounted) return;
-        setState(() => _flyerImages[page.imagePath] = frame.image);
+        if (page.imageUrl.isEmpty || _flyerImages.containsKey(page.imageUrl)) {
+          continue;
+        }
+        try {
+          final response = await http.get(Uri.parse(page.imageUrl));
+          if (response.statusCode != 200) continue;
+          final codec = await ui.instantiateImageCodec(response.bodyBytes);
+          final frame = await codec.getNextFrame();
+          if (!mounted) return;
+          setState(() => _flyerImages[page.imageUrl] = frame.image);
+        } catch (_) {
+          // Skip; tap-handling and the deal sheet handle a missing image.
+        }
       }
     }
   }
@@ -155,14 +172,14 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final double nx = localPosition.dx / imageSize.width;
     final double ny = localPosition.dy / imageSize.height;
 
-    final FlyerPage page = stores[storeIdx].pages[pageIdx];
+    final FlyerPage page = _stores[storeIdx].pages[pageIdx];
     final FlyerItem? tapped = page.items.cast<FlyerItem?>().firstWhere(
       (item) => item!.boundingBox.contains(Offset(nx, ny)),
       orElse: () => null,
     );
     if (tapped == null) return;
 
-    final store = stores[storeIdx];
+    final store = _stores[storeIdx];
     final manager = ShoppingListManager();
 
     final AnimationController? existing = _highlightControllers[tapped.id];
@@ -186,13 +203,13 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       controller.forward();
 
       // Add to shopping list
-      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imagePath]);
+      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imageUrl]);
 
-      _showItemBottomSheet(tapped, page.imagePath);
+      _showItemBottomSheet(tapped, page.imageUrl);
     } else if (existing.status == AnimationStatus.reverse) {
       existing.forward();
-      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imagePath]);
-      _showItemBottomSheet(tapped, page.imagePath);
+      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imageUrl]);
+      _showItemBottomSheet(tapped, page.imageUrl);
     } else {
       existing.reverse();
     }
@@ -200,8 +217,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
 
   /// Builds the hand-drawn circle overlays for one page.
   List<Widget> _buildHighlights(int storeIdx, int pageIdx) {
-    final Set<FlyerItem> pageItems =
-        stores[storeIdx].pages[pageIdx].items.toSet();
+    final Set<FlyerItem> pageItems = _stores[storeIdx].pages[pageIdx].items
+        .toSet();
     return _highlights.where(pageItems.contains).map((item) {
       final controller = _highlightControllers[item.id]!;
       return Positioned.fill(
@@ -222,7 +239,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   }
 
   Widget _buildStoreScroll(int storeIdx) {
-    final Store store = stores[storeIdx];
+    final Store store = _stores[storeIdx];
     return LayoutBuilder(
       builder: (context, constraints) {
         final double width = constraints.maxWidth;
@@ -247,8 +264,14 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
                 _buildTabBar(store),
                 const SizedBox(height: _tabBarBottomSpace),
                 if (showWeekly)
-                  for (int i = 0; i < store.pages.length; i++)
-                    _buildFlyerImage(storeIdx, i, width, pageHeights[i])
+                  if (store.pages.isEmpty)
+                    _buildEmptyState(
+                      viewportHeight - _tabBarHeight - _tabBarBottomSpace,
+                      message: 'No pages yet for ${store.name}',
+                    )
+                  else
+                    for (int i = 0; i < store.pages.length; i++)
+                      _buildFlyerImage(storeIdx, i, width, pageHeights[i])
                 else
                   _buildEmptyState(
                     viewportHeight - _tabBarHeight - _tabBarBottomSpace,
@@ -290,21 +313,20 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     }
   }
 
-  Widget _buildEmptyState(double height) {
+  Widget _buildEmptyState(
+    double height, {
+    String message = 'No related ads yet',
+  }) {
     return SizedBox(
       height: height > 200 ? height : 320,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.inbox_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 12),
             Text(
-              'No related ads yet',
+              message,
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
@@ -362,7 +384,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     double width,
     double height,
   ) {
-    final FlyerPage page = stores[storeIdx].pages[pageIdx];
+    final FlyerPage page = _stores[storeIdx].pages[pageIdx];
     return SizedBox(
       width: width,
       height: height,
@@ -376,7 +398,19 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         child: Stack(
           children: [
             Positioned.fill(
-              child: Image.asset(page.imagePath, fit: BoxFit.fill),
+              child: page.imageUrl.isEmpty
+                  ? const ColoredBox(color: Color(0xFFF2F3F5))
+                  : Image.network(
+                      page.imageUrl,
+                      fit: BoxFit.fill,
+                      loadingBuilder: (context, child, progress) {
+                        if (progress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (_, _, _) => const Center(
+                        child: Icon(Icons.broken_image_outlined, size: 48),
+                      ),
+                    ),
             ),
             ..._buildHighlights(storeIdx, pageIdx),
           ],
@@ -388,7 +422,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   Widget _buildFlyerView() {
     return PageView.builder(
       controller: _storeController,
-      itemCount: stores.length,
+      itemCount: _stores.length,
       onPageChanged: (index) {
         setState(() {
           _currentStore = index;
@@ -404,7 +438,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   }
 
   Widget _buildDotPill() {
-    final int storeCount = stores.length;
+    final int storeCount = _stores.length;
     if (storeCount <= 1) return const SizedBox.shrink();
 
     return Container(
@@ -439,7 +473,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     );
   }
 
-  void _showItemBottomSheet(FlyerItem item, String imagePath) {
+  void _showItemBottomSheet(FlyerItem item, String imageUrl) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -451,7 +485,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       // colour behind the sheet instead of being greyed out.
       barrierColor: Colors.transparent,
       builder: (ctx) =>
-          DealSheet(item: item, flyerImage: _flyerImages[imagePath]),
+          DealSheet(item: item, flyerImage: _flyerImages[imageUrl]),
     );
   }
 
@@ -500,9 +534,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
                 color: Colors.black54,
               ),
               onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ListsScreen()),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const ListsScreen()));
               },
             ),
           IconButton(

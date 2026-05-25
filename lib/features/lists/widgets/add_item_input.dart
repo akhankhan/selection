@@ -84,7 +84,10 @@ class _AddItemInputState extends State<AddItemInput> {
               DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   value: _selectedList,
-                  icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black87),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Colors.black87,
+                  ),
                   style: const TextStyle(fontSize: 14, color: Colors.black87),
                   items: widget.lists
                       .map((l) => DropdownMenuItem(value: l, child: Text(l)))

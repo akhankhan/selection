@@ -43,7 +43,9 @@ class DeleteOptionsSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Row(
               children: [
-                const SizedBox(width: 48), // Offsets the close button for perfect centering
+                const SizedBox(
+                  width: 48,
+                ), // Offsets the close button for perfect centering
                 const Expanded(
                   child: Text(
                     'Delete options',

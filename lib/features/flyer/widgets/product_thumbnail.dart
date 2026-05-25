@@ -86,11 +86,19 @@ class _CropPainter extends CustomPainter {
       if (srcAspect > dstAspect) {
         final double w = src.height * dstAspect;
         src = Rect.fromLTWH(
-            src.left + (src.width - w) / 2, src.top, w, src.height);
+          src.left + (src.width - w) / 2,
+          src.top,
+          w,
+          src.height,
+        );
       } else {
         final double h = src.width / dstAspect;
         src = Rect.fromLTWH(
-            src.left, src.top + (src.height - h) / 2, src.width, h);
+          src.left,
+          src.top + (src.height - h) / 2,
+          src.width,
+          h,
+        );
       }
       canvas.drawImageRect(image, src, Offset.zero & size, paint);
     }

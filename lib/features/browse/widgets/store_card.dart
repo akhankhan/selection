@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../flyer/models/store.dart';
 
@@ -5,134 +6,184 @@ enum CardStatus { newBadge, untilText, previewBadge, expiringText }
 
 class StoreCard extends StatelessWidget {
   final Store store;
-  final String? statusLabel;
-  final CardStatus statusType;
+  final bool isFavorited;
+  final VoidCallback? onFavoriteToggle;
   final VoidCallback? onTap;
 
   const StoreCard({
     super.key,
     required this.store,
-    this.statusLabel,
-    this.statusType = CardStatus.newBadge,
+    required this.isFavorited,
+    this.onFavoriteToggle,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final String thumbnail =
-        store.pages.isNotEmpty ? store.pages.first.imagePath : '';
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        store.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Color(0xFF1A1A1A),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+    final String imageUrl = store.pages.isNotEmpty
+        ? store.pages.first.imageUrl
+        : '';
+
+    // Determine status badge based on store dates or mockup values matching the screenshots
+    Widget statusWidget = const SizedBox.shrink();
+    if (store.name.toLowerCase().contains('shoppers')) {
+      statusWidget = _buildStatusBadge(
+        'Preview',
+        const Color(0xFFE8F5E9),
+        const Color(0xFF2E7D32),
+      );
+    } else if (store.name.toLowerCase().contains('petsmart')) {
+      statusWidget = _buildStatusBadge(
+        'Ends Today',
+        const Color(0xFFFFEBEE),
+        const Color(0xFFC62828),
+      );
+    } else if (store.name.toLowerCase().contains('staples') ||
+        store.name.toLowerCase().contains('powell')) {
+      statusWidget = _buildStatusBadge(
+        'New',
+        const Color(0xFFE0F2FE),
+        const Color(0xFF0071CE),
+      );
+    } else {
+      // Default standard date range text
+      statusWidget = Text(
+        store.dateRange,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.grey[600],
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Card Header containing Title, Status, and Heart Icon
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            store.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5,
+                              color: Color(0xFF1E293B),
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          statusWidget,
+                        ],
                       ),
-                      const SizedBox(height: 2),
-                      if (statusLabel != null) _buildStatus(),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.favorite_border,
-                  size: 20,
-                  color: Colors.grey[600],
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Container(
-                  width: double.infinity,
-                  color: const Color(0xFFF2F3F5),
-                  child: thumbnail.isEmpty
-                      ? const Icon(
-                          Icons.image_outlined,
-                          size: 40,
-                          color: Colors.grey,
-                        )
-                      : Image.asset(thumbnail, fit: BoxFit.cover),
+                    ),
+                    const SizedBox(width: 4),
+                    // Favorite Toggle Icon Button
+                    GestureDetector(
+                      onTap: onFavoriteToggle,
+                      behavior: HitTestBehavior.opaque,
+                      child: Padding(
+                        padding: const EdgeInsets.all(2.0),
+                        child: Icon(
+                          isFavorited ? Icons.favorite : Icons.favorite_border,
+                          size: 20,
+                          color: isFavorited
+                              ? Colors.red
+                              : const Color(0xFF8C96A3),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+
+              // Flyer Image content
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  color: const Color(0xFFF8FAFC),
+                  child: imageUrl.isEmpty
+                      ? const Center(
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 32,
+                            color: Colors.grey,
+                          ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.topCenter,
+                          placeholder: (_, _) => const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF0071CE),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (_, _, _) => const Center(
+                            child: Icon(
+                              Icons.broken_image_outlined,
+                              size: 24,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildStatus() {
-    switch (statusType) {
-      case CardStatus.newBadge:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF2E7D32),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: Text(
-            statusLabel!,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        );
-      case CardStatus.previewBadge:
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF59E0B),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: Text(
-            statusLabel!,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        );
-      case CardStatus.untilText:
-        return Text(
-          statusLabel!,
-          style: const TextStyle(
-            color: Color(0xFF0071CE),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        );
-      case CardStatus.expiringText:
-        return Text(
-          statusLabel!,
-          style: const TextStyle(
-            color: Color(0xFFD32F2F),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        );
-    }
+  Widget _buildStatusBadge(String text, Color bgColor, Color fgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: fgColor,
+          fontSize: 10.5,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 }

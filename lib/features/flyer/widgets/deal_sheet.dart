@@ -40,12 +40,12 @@ class _DealSheetState extends State<DealSheet> {
     final double screenHeight = MediaQuery.of(context).size.height;
     if (screenHeight <= 0) return 0.23;
     final double bottomPadding = MediaQuery.of(context).padding.bottom;
-    
+
     // Standard compact content heights: 24 (handle) + 72 (image) + 16 (padding) + 60 (buttons) = 172
     // If the product title is long and wraps to 2 lines, we add a 16dp buffer.
     final double titleBuffer = widget.item.name.length > 20 ? 16.0 : 0.0;
     final double targetHeight = 172.0 + titleBuffer + bottomPadding;
-    
+
     return (targetHeight / screenHeight).clamp(0.15, 0.4);
   }
 
@@ -97,8 +97,7 @@ class _DealSheetState extends State<DealSheet> {
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
       controller: _controller,
-      initialChildSize:
-          widget.startExpanded ? _expandedSize : _collapsedSize,
+      initialChildSize: widget.startExpanded ? _expandedSize : _collapsedSize,
       minChildSize: _collapsedSize,
       maxChildSize: _expandedSize,
       snap: true,
@@ -210,12 +209,17 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-   /// Full detail view shown when the sheet is expanded.
+  /// Full detail view shown when the sheet is expanded.
   Widget _buildExpanded() {
     final FlyerItem item = widget.item;
     // Demo detail content matching the screenshot structure:
-    final String sku = item.id.hashCode.abs().toString().padRight(13, '0').substring(0, 13);
-    final String productCode = (item.id.hashCode.abs() % 9000000 + 1000000).toString();
+    final String sku = item.id.hashCode
+        .abs()
+        .toString()
+        .padRight(13, '0')
+        .substring(0, 13);
+    final String productCode = (item.id.hashCode.abs() % 9000000 + 1000000)
+        .toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,11 +348,7 @@ class _DealSheetState extends State<DealSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
       child: Text(
         text,
-        style: const TextStyle(
-          fontSize: 14,
-          color: _ink,
-          height: 1.4,
-        ),
+        style: const TextStyle(fontSize: 14, color: _ink, height: 1.4),
       ),
     );
   }
@@ -381,7 +381,10 @@ class _DealSheetState extends State<DealSheet> {
         16,
         6,
         16,
-        6 + (MediaQuery.of(context).padding.bottom > 0 ? MediaQuery.of(context).padding.bottom : 0),
+        6 +
+            (MediaQuery.of(context).padding.bottom > 0
+                ? MediaQuery.of(context).padding.bottom
+                : 0),
       ),
       child: Row(
         children: [

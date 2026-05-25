@@ -10,9 +10,7 @@ class ShoppingListManager extends ChangeNotifier {
   factory ShoppingListManager() => _instance;
 
   ShoppingListManager._internal() {
-    _sections = [
-      ListSection(title: 'My List', items: []),
-    ];
+    _sections = [ListSection(title: 'My List', items: [])];
   }
 
   late final List<ListSection> _sections;
@@ -60,8 +58,12 @@ class ShoppingListManager extends ChangeNotifier {
     String? saveText;
     if (item.oldPrice != null) {
       try {
-        final double oldP = double.parse(item.oldPrice!.replaceAll('\$', '').trim());
-        final double newP = double.parse(item.price.replaceAll('\$', '').trim());
+        final double oldP = double.parse(
+          item.oldPrice!.replaceAll('\$', '').trim(),
+        );
+        final double newP = double.parse(
+          item.price.replaceAll('\$', '').trim(),
+        );
         final double diff = oldP - newP;
         if (diff > 0) {
           saveText = 'SAVE \$${diff.toStringAsFixed(2)}';
@@ -118,10 +120,7 @@ class ShoppingListManager extends ChangeNotifier {
       _sections.add(section);
     }
 
-    final listItem = ListItem(
-      name: name,
-      thumbnail: const GenericThumbnail(),
-    );
+    final listItem = ListItem(name: name, thumbnail: const GenericThumbnail());
 
     section.items.add(listItem);
     notifyListeners();
@@ -146,7 +145,7 @@ class ShoppingListManager extends ChangeNotifier {
     }
     // Clean up empty store sections (except My List)
     _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
-    
+
     notifyListeners();
   }
 

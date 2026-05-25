@@ -96,19 +96,13 @@ class BedThumbnail extends StatelessWidget {
               left: 18,
               top: 26,
               right: 18,
-              child: Container(
-                height: 6,
-                color: const Color(0xFFEEE3D0),
-              ),
+              child: Container(height: 6, color: const Color(0xFFEEE3D0)),
             ),
             Positioned(
               left: 18,
               top: 32,
               right: 18,
-              child: Container(
-                height: 24,
-                color: const Color(0xFF382B1E),
-              ),
+              child: Container(height: 24, color: const Color(0xFF382B1E)),
             ),
             Positioned(
               left: 0,

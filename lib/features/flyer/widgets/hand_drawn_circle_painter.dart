@@ -51,7 +51,8 @@ class HandDrawnCirclePainter extends CustomPainter {
 
     // Small whole-shape tilt + centre jitter -> looks sketched by hand.
     final double tilt = (rnd.nextDouble() - 0.5) * 0.16;
-    final Offset center = bounds.center +
+    final Offset center =
+        bounds.center +
         Offset(
           (rnd.nextDouble() - 0.5) * bounds.width * 0.05,
           (rnd.nextDouble() - 0.5) * bounds.height * 0.05,
@@ -73,10 +74,10 @@ class HandDrawnCirclePainter extends CustomPainter {
     final double sinT = math.sin(tilt);
 
     Offset pointAt(double t) {
-      final double a = startAngle - totalSweep * t; // minus -> counter-clockwise
-      final double wobble = 1 +
-          wobA * math.sin(a * 2 + phaseA) +
-          wobB * math.sin(a * 3 + phaseB);
+      final double a =
+          startAngle - totalSweep * t; // minus -> counter-clockwise
+      final double wobble =
+          1 + wobA * math.sin(a * 2 + phaseA) + wobB * math.sin(a * 3 + phaseB);
       final double x = math.cos(a) * rx * wobble;
       final double y = math.sin(a) * ry * wobble;
       return center + Offset(x * cosT - y * sinT, x * sinT + y * cosT);
@@ -94,8 +95,9 @@ class HandDrawnCirclePainter extends CustomPainter {
       }
     }
 
-    final double strokeW =
-        (math.min(rx, ry) * 0.17).clamp(4.5, 12.0).toDouble();
+    final double strokeW = (math.min(rx, ry) * 0.17)
+        .clamp(4.5, 12.0)
+        .toDouble();
 
     // Reveal the stroke up to `progress`. The loop already overshoots a full
     // turn, so the marker just crosses itself at the top — no arrowhead.
