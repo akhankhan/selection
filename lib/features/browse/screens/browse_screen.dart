@@ -812,85 +812,144 @@ class _BrowseScreenState extends State<BrowseScreen> {
         .where((s) => !s.name.toLowerCase().contains('shopper'))
         .toList();
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(top: 103.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionHeader('Upcoming'),
-          if (upcoming.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _inlineEmpty('No upcoming flyers'),
-            )
-          else
-            _storeGridView(upcoming, 2),
-          const SizedBox(height: 16),
-          _sectionHeader('New This Week'),
-          if (newThisWeek.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _inlineEmpty('Nothing new this week'),
-            )
-          else
-            _storeGridView(newThisWeek, 2),
-          const SizedBox(height: 24),
-        ],
-      ),
+    return ValueListenableBuilder<int>(
+      valueListenable: _selectedCategory,
+      builder: (context, activeCategory, _) {
+        final bool isPageActive = 2 == activeCategory;
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            const SliverToBoxAdapter(child: SizedBox(height: 103.0)),
+            SliverToBoxAdapter(child: _sectionHeader('Upcoming')),
+            if (upcoming.isEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(child: _inlineEmpty('No upcoming flyers')),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.74,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => StaggeredGridEntry(
+                      key: ValueKey('${upcoming[i].id}_${isPageActive ? "active" : "inactive"}'),
+                      index: i,
+                      child: StoreCard(
+                        store: upcoming[i],
+                        isFavorited: _favoritedStoreIds.contains(upcoming[i].id),
+                        onFavoriteToggle: () {
+                          setState(() {
+                            if (_favoritedStoreIds.contains(upcoming[i].id)) {
+                              _favoritedStoreIds.remove(upcoming[i].id);
+                            } else {
+                              _favoritedStoreIds.add(upcoming[i].id);
+                            }
+                          });
+                        },
+                        onTap: () => _openStore(upcoming, i),
+                      ),
+                    ),
+                    childCount: upcoming.length,
+                  ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            SliverToBoxAdapter(child: _sectionHeader('New This Week')),
+            if (newThisWeek.isEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverToBoxAdapter(child: _inlineEmpty('Nothing new this week')),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 0.74,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => StaggeredGridEntry(
+                      key: ValueKey('${newThisWeek[i].id}_${isPageActive ? "active" : "inactive"}'),
+                      index: i,
+                      child: StoreCard(
+                        store: newThisWeek[i],
+                        isFavorited: _favoritedStoreIds.contains(newThisWeek[i].id),
+                        onFavoriteToggle: () {
+                          setState(() {
+                            if (_favoritedStoreIds.contains(newThisWeek[i].id)) {
+                              _favoritedStoreIds.remove(newThisWeek[i].id);
+                            } else {
+                              _favoritedStoreIds.add(newThisWeek[i].id);
+                            }
+                          });
+                        },
+                        onTap: () => _openStore(newThisWeek, i),
+                      ),
+                    ),
+                    childCount: newThisWeek.length,
+                  ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildStoreGrid(List<Store> stores, String headerLabel, int pageIndex) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(top: 103.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionHeader(headerLabel),
-          const SizedBox(height: 4),
-          _storeGridView(stores, pageIndex),
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
-  }
-
-  Widget _storeGridView(List<Store> stores, int pageIndex) {
     return ValueListenableBuilder<int>(
       valueListenable: _selectedCategory,
       builder: (context, activeCategory, _) {
         final bool isPageActive = pageIndex == activeCategory;
-
-        return GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          childAspectRatio: 0.74,
-          mainAxisSpacing: 14,
-          crossAxisSpacing: 14,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          children: [
-            for (int i = 0; i < stores.length; i++)
-              StaggeredGridEntry(
-                key: ValueKey('${stores[i].id}_${isPageActive ? "active" : "inactive"}'),
-                index: i,
-                child: StoreCard(
-                  store: stores[i],
-                  isFavorited: _favoritedStoreIds.contains(stores[i].id),
-                  onFavoriteToggle: () {
-                    setState(() {
-                      if (_favoritedStoreIds.contains(stores[i].id)) {
-                        _favoritedStoreIds.remove(stores[i].id);
-                      } else {
-                        _favoritedStoreIds.add(stores[i].id);
-                      }
-                    });
-                  },
-                  onTap: () => _openStore(stores, i),
+        return CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            const SliverToBoxAdapter(child: SizedBox(height: 103.0)),
+            SliverToBoxAdapter(child: _sectionHeader(headerLabel)),
+            const SliverToBoxAdapter(child: SizedBox(height: 4)),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.74,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => StaggeredGridEntry(
+                    key: ValueKey('${stores[i].id}_${isPageActive ? "active" : "inactive"}'),
+                    index: i,
+                    child: StoreCard(
+                      store: stores[i],
+                      isFavorited: _favoritedStoreIds.contains(stores[i].id),
+                      onFavoriteToggle: () {
+                        setState(() {
+                          if (_favoritedStoreIds.contains(stores[i].id)) {
+                            _favoritedStoreIds.remove(stores[i].id);
+                          } else {
+                            _favoritedStoreIds.add(stores[i].id);
+                          }
+                        });
+                      },
+                      onTap: () => _openStore(stores, i),
+                    ),
+                  ),
+                  childCount: stores.length,
                 ),
               ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         );
       },

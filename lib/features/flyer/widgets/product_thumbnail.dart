@@ -39,9 +39,11 @@ class ProductThumbnail extends StatelessWidget {
                 ),
               ),
             )
-          : CustomPaint(
-              size: Size.infinite,
-              painter: _CropPainter(flyerImage!, cropRect, fit),
+          : RepaintBoundary(
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: _CropPainter(flyerImage!, cropRect, fit),
+              ),
             ),
     );
   }

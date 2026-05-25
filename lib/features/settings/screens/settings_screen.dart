@@ -28,28 +28,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Select Theme',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ['System', 'Light', 'Dark'].map((theme) {
-              return ListTile(
-                title: Text(theme),
-                leading: Radio<String>(
-                  value: theme,
-                  groupValue: _selectedTheme,
-                  activeColor: _brandBlue,
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _selectedTheme = value);
-                      Navigator.pop(context);
-                    }
+          content: RadioGroup<String>(
+            groupValue: _selectedTheme,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _selectedTheme = value);
+                Navigator.pop(context);
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ['System', 'Light', 'Dark'].map((theme) {
+                return ListTile(
+                  title: Text(theme),
+                  leading: Radio<String>(
+                    value: theme,
+                    activeColor: _brandBlue,
+                  ),
+                  onTap: () {
+                    setState(() => _selectedTheme = theme);
+                    Navigator.pop(context);
                   },
-                ),
-                onTap: () {
-                  setState(() => _selectedTheme = theme);
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         );
       },
@@ -66,30 +68,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Auto Delete Expired Items',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: ['Never (Default)', 'After 7 days', 'After 30 days'].map((
-              option,
-            ) {
-              return ListTile(
-                title: Text(option),
-                leading: Radio<String>(
-                  value: option,
-                  groupValue: _autoDeleteOption,
-                  activeColor: _brandBlue,
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _autoDeleteOption = value);
-                      Navigator.pop(context);
-                    }
+          content: RadioGroup<String>(
+            groupValue: _autoDeleteOption,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _autoDeleteOption = value);
+                Navigator.pop(context);
+              }
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ['Never (Default)', 'After 7 days', 'After 30 days'].map((
+                option,
+              ) {
+                return ListTile(
+                  title: Text(option),
+                  leading: Radio<String>(
+                    value: option,
+                    activeColor: _brandBlue,
+                  ),
+                  onTap: () {
+                    setState(() => _autoDeleteOption = option);
+                    Navigator.pop(context);
                   },
-                ),
-                onTap: () {
-                  setState(() => _autoDeleteOption = option);
-                  Navigator.pop(context);
-                },
-              );
-            }).toList(),
+                );
+              }).toList(),
+            ),
           ),
         );
       },

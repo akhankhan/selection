@@ -1,6 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/flyer_item.dart';
 import '../models/store.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
@@ -129,19 +129,29 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     }
   }
 
-  Future<void> _loadFlyerImages() async {
+  void _loadFlyerImages() {
     for (final store in _stores) {
       for (final page in store.pages) {
         if (page.imageUrl.isEmpty || _flyerImages.containsKey(page.imageUrl)) {
           continue;
         }
         try {
-          final response = await http.get(Uri.parse(page.imageUrl));
-          if (response.statusCode != 200) continue;
-          final codec = await ui.instantiateImageCodec(response.bodyBytes);
-          final frame = await codec.getNextFrame();
-          if (!mounted) return;
-          setState(() => _flyerImages[page.imageUrl] = frame.image);
+          final imageProvider = CachedNetworkImageProvider(page.imageUrl);
+          final stream = imageProvider.resolve(ImageConfiguration.empty);
+          stream.addListener(
+            ImageStreamListener(
+              (ImageInfo info, bool _) {
+                if (mounted) {
+                  setState(() {
+                    _flyerImages[page.imageUrl] = info.image;
+                  });
+                }
+              },
+              onError: (exception, stackTrace) {
+                debugPrint('Failed to cache flyer image: $exception');
+              },
+            ),
+          );
         } catch (_) {
           // Skip; tap-handling and the deal sheet handle a missing image.
         }
@@ -223,13 +233,15 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       final controller = _highlightControllers[item.id]!;
       return Positioned.fill(
         child: IgnorePointer(
-          child: AnimatedBuilder(
-            animation: controller,
-            builder: (_, _) => CustomPaint(
-              painter: HandDrawnCirclePainter(
-                normalizedRect: item.boundingBox,
-                progress: Curves.easeOutCubic.transform(controller.value),
-                seed: item.id.hashCode,
+          child: RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (_, _) => CustomPaint(
+                painter: HandDrawnCirclePainter(
+                  normalizedRect: item.boundingBox,
+                  progress: Curves.easeOutCubic.transform(controller.value),
+                  seed: item.id.hashCode,
+                ),
               ),
             ),
           ),
@@ -257,27 +269,39 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             }
             return false;
           },
-          child: SingleChildScrollView(
+          child: ListView.builder(
             controller: _scrollControllers[storeIdx],
-            child: Column(
-              children: [
-                _buildTabBar(store),
-                const SizedBox(height: _tabBarBottomSpace),
-                if (showWeekly)
-                  if (store.pages.isEmpty)
-                    _buildEmptyState(
-                      viewportHeight - _tabBarHeight - _tabBarBottomSpace,
-                      message: 'No pages yet for ${store.name}',
-                    )
-                  else
-                    for (int i = 0; i < store.pages.length; i++)
-                      _buildFlyerImage(storeIdx, i, width, pageHeights[i])
-                else
-                  _buildEmptyState(
+            padding: EdgeInsets.zero,
+            physics: const BouncingScrollPhysics(),
+            itemCount: showWeekly
+                ? (store.pages.isEmpty ? 2 : store.pages.length + 1)
+                : 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTabBar(store),
+                    const SizedBox(height: _tabBarBottomSpace),
+                  ],
+                );
+              }
+
+              if (showWeekly) {
+                if (store.pages.isEmpty) {
+                  return _buildEmptyState(
                     viewportHeight - _tabBarHeight - _tabBarBottomSpace,
-                  ),
-              ],
-            ),
+                    message: 'No pages yet for ${store.name}',
+                  );
+                }
+                final pageIdx = index - 1;
+                return _buildFlyerImage(storeIdx, pageIdx, width, pageHeights[pageIdx]);
+              } else {
+                return _buildEmptyState(
+                  viewportHeight - _tabBarHeight - _tabBarBottomSpace,
+                );
+              }
+            },
           ),
         );
       },
