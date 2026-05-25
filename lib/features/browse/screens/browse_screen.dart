@@ -41,6 +41,168 @@ class _BrowseScreenState extends State<BrowseScreen> {
   String _currentLocation = 'A1A 1A1';
   final Set<String> _favoritedStoreIds = {};
 
+  late PageController _pageController;
+  final ScrollController _tabsScrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _selectedCategory);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _tabsScrollController.dispose();
+    super.dispose();
+  }
+
+  double _getTabWidth(int categoryIndex) {
+    if (categoryIndex == 0) return 56.0;
+    final name = _categories[categoryIndex];
+    // Approximate character width in pixels + horizontal padding of 24
+    return name.length * 8.5 + 24.0;
+  }
+
+  void _scrollToCategoryTab(int index) {
+    if (!_tabsScrollController.hasClients) return;
+
+    double targetOffset = 0.0;
+    if (index > 0) {
+      final double screenWidth = MediaQuery.of(context).size.width;
+      // Viewport width is screen width minus the pinned heart tab (56) and vertical divider (1)
+      final double viewportWidth = screenWidth - 57.0;
+
+      double tabStartOffset = 0.0;
+      for (int i = 1; i < index; i++) {
+        tabStartOffset += _getTabWidth(i);
+      }
+      final double targetTabWidth = _getTabWidth(index);
+      final double tabCenter = tabStartOffset + (targetTabWidth / 2.0);
+
+      // Center the tab inside the scrollable viewport
+      targetOffset = tabCenter - (viewportWidth / 2.0);
+    }
+
+    _tabsScrollController.animateTo(
+      targetOffset.clamp(0.0, _tabsScrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  List<Store> _filterStoresByCategory(List<Store> stores, int index) {
+    if (index == 0) {
+      return stores.where((s) => _favoritedStoreIds.contains(s.id)).toList();
+    }
+    if (index == 1) {
+      return stores; // Explore: all stores
+    }
+    if (index == 2) {
+      return stores; // Latest: handled separately with Upcoming & New
+    }
+    if (index == 3) {
+      // A-Z: all stores sorted alphabetically by name
+      final list = List<Store>.from(stores);
+      list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      return list;
+    }
+
+    final category = _categories[index].toLowerCase();
+    return stores.where((store) {
+      final name = store.name.toLowerCase();
+      if (category == 'groceries') {
+        return name.contains('grocer') ||
+            name.contains('market') ||
+            name.contains('supermarket') ||
+            name.contains('food') ||
+            name.contains('metro') ||
+            name.contains('sobeys') ||
+            name.contains('loblaw') ||
+            name.contains('costco') ||
+            name.contains('safeway') ||
+            name.contains('freshco') ||
+            name.contains('no frills') ||
+            name.contains('real canadian superstore') ||
+            name.contains('walmart') ||
+            name.contains('iga');
+      } else if (category == 'restaurants') {
+        return name.contains('restaurant') ||
+            name.contains('mcdonald') ||
+            name.contains('burger') ||
+            name.contains('pizza') ||
+            name.contains('subway') ||
+            name.contains('kfc') ||
+            name.contains('tim hortons') ||
+            name.contains('starbucks') ||
+            name.contains('wendy') ||
+            name.contains('taco');
+      } else if (category == 'home & garden') {
+        return name.contains('home') ||
+            name.contains('garden') ||
+            name.contains('depot') ||
+            name.contains('lowe') ||
+            name.contains('ikea') ||
+            name.contains('canadian tire') ||
+            name.contains('hardware') ||
+            name.contains('bed bath') ||
+            name.contains('renodepot') ||
+            name.contains('rona');
+      } else if (category == 'pharmacy') {
+        return name.contains('pharmacy') ||
+            name.contains('drug') ||
+            name.contains('shoppers') ||
+            name.contains('rexall') ||
+            name.contains('pharma') ||
+            name.contains('health') ||
+            name.contains('london drugs');
+      } else if (category == 'general merchandise') {
+        return name.contains('walmart') ||
+            name.contains('costco') ||
+            name.contains('target') ||
+            name.contains('dollarama') ||
+            name.contains('giant tiger') ||
+            name.contains('marshalls') ||
+            name.contains('winners');
+      } else if (category == 'electronics') {
+        return name.contains('electronic') ||
+            name.contains('best buy') ||
+            name.contains('apple') ||
+            name.contains('source') ||
+            name.contains('staples') ||
+            name.contains('cell') ||
+            name.contains('tbooster');
+      } else if (category == 'automotive') {
+        return name.contains('auto') ||
+            name.contains('tire') ||
+            name.contains('canadian tire') ||
+            name.contains('part') ||
+            name.contains('garage') ||
+            name.contains('napa');
+      } else if (category == 'pets') {
+        return name.contains('pet') ||
+            name.contains('animal') ||
+            name.contains('dog') ||
+            name.contains('cat') ||
+            name.contains('petsmart') ||
+            name.contains('pet valu');
+      } else if (category == 'office') {
+        return name.contains('office') ||
+            name.contains('staples') ||
+            name.contains('depot') ||
+            name.contains('ink') ||
+            name.contains('paper');
+      } else if (category == 'specialty') {
+        return !name.contains('grocer') &&
+            !name.contains('walmart') &&
+            !name.contains('sobeys') &&
+            !name.contains('shoppers') &&
+            !name.contains('home');
+      }
+      return false;
+    }).toList();
+  }
+
   void _openStore(List<Store> stores, int storeIndex) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -206,7 +368,42 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     ],
                   ),
                 ),
-                Expanded(child: _buildBody(stores)),
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _categories.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _selectedCategory = index;
+                      });
+                      _scrollToCategoryTab(index);
+                    },
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        // Favorites heart tab
+                        final favStores = _filterStoresByCategory(stores, 0);
+                        if (favStores.isEmpty) {
+                          return _buildEmptyFavorites();
+                        }
+                        return _buildStoreGrid(favStores, 'Your Favorites');
+                      } else if (index == 2) {
+                        // Latest
+                        return _buildLatest(stores);
+                      } else {
+                        // Explore (index 1), A-Z (index 3), and general category filter
+                        final filtered = _filterStoresByCategory(stores, index);
+                        final String categoryName = _categories[index];
+                        final String title = index == 1
+                            ? 'New This Week'
+                            : categoryName;
+                        if (index > 3 && filtered.isEmpty) {
+                          return _buildEmptyCategory(categoryName);
+                        }
+                        return _buildStoreGrid(filtered, title);
+                      }
+                    },
+                  ),
+                ),
               ],
             );
           },
@@ -426,7 +623,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
         children: [
           // 1. Pinned Favorites Heart Tab (Fixed on the far left)
           InkWell(
-            onTap: () => setState(() => _selectedCategory = 0),
+            onTap: () {
+              _pageController.animateToPage(
+                0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
             child: Container(
               width: 56,
               height: double.infinity,
@@ -461,6 +664,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
           // 3. Scrollable List of Categories (Explore, Latest, etc.)
           Expanded(
             child: ListView.builder(
+              controller: _tabsScrollController,
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 4),
               itemCount:
@@ -471,8 +675,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 final bool active = _selectedCategory == categoryIndex;
 
                 return InkWell(
-                  onTap: () =>
-                      setState(() => _selectedCategory = categoryIndex),
+                  onTap: () {
+                    _pageController.animateToPage(
+                      categoryIndex,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Column(
@@ -509,29 +718,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildBody(List<Store> stores) {
-    if (stores.isEmpty) {
-      return _buildEmpty('No flyers yet — check back soon');
-    }
-    switch (_selectedCategory) {
-      case 0: // Favorites heart tab
-        final favStores = stores
-            .where((s) => _favoritedStoreIds.contains(s.id))
-            .toList();
-        if (favStores.isEmpty) {
-          return _buildEmptyFavorites();
-        }
-        return _buildStoreGrid(favStores, 'Your Favorites');
-      case 2: // Latest
-        return _buildLatest(stores);
-      case 1: // Explore
-      case 3: // A-Z
-      default:
-        // By default, for Explore / Latest, let's group them or show "New This Week" as in the screenshots!
-        return _buildStoreGrid(stores, 'New This Week');
-    }
   }
 
   Widget _buildEmptyFavorites() {
@@ -701,22 +887,36 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
-  Widget _buildEmpty(String message) {
+  Widget _buildEmptyCategory(String categoryName) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.storefront_outlined, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No $categoryName flyers found',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'We update our flyers daily. Please check back later or try another category.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
