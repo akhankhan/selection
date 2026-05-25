@@ -36,7 +36,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     'Specialty',
   ];
 
-  int _selectedCategory = 1; // Default: Explore
+  final ValueNotifier<int> _selectedCategory = ValueNotifier<int>(1);
   int _bottomNavIndex = 0;
   String _currentLocation = 'A1A 1A1';
   final Set<String> _favoritedStoreIds = {};
@@ -47,13 +47,16 @@ class _BrowseScreenState extends State<BrowseScreen> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _selectedCategory);
+    _pageController = PageController(initialPage: _selectedCategory.value);
+    _pageController.addListener(_onPageScroll);
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(_onPageScroll);
     _pageController.dispose();
     _tabsScrollController.dispose();
+    _selectedCategory.dispose();
     super.dispose();
   }
 
@@ -64,31 +67,48 @@ class _BrowseScreenState extends State<BrowseScreen> {
     return name.length * 8.5 + 24.0;
   }
 
-  void _scrollToCategoryTab(int index) {
-    if (!_tabsScrollController.hasClients) return;
+  double _getScrollOffsetForPage(double page) {
+    if (page <= 0.0) return 0.0;
 
-    double targetOffset = 0.0;
-    if (index > 0) {
-      final double screenWidth = MediaQuery.of(context).size.width;
-      // Viewport width is screen width minus the pinned heart tab (56) and vertical divider (1)
-      final double viewportWidth = screenWidth - 57.0;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double viewportWidth = screenWidth - 57.0;
 
+    double getOffsetForIndex(int idx) {
+      if (idx <= 0) return 0.0;
       double tabStartOffset = 0.0;
-      for (int i = 1; i < index; i++) {
+      for (int i = 1; i < idx; i++) {
         tabStartOffset += _getTabWidth(i);
       }
-      final double targetTabWidth = _getTabWidth(index);
+      final double targetTabWidth = _getTabWidth(idx);
       final double tabCenter = tabStartOffset + (targetTabWidth / 2.0);
-
-      // Center the tab inside the scrollable viewport
-      targetOffset = tabCenter - (viewportWidth / 2.0);
+      return tabCenter - (viewportWidth / 2.0);
     }
 
-    _tabsScrollController.animateTo(
-      targetOffset.clamp(0.0, _tabsScrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    final int lowerIndex = page.floor();
+    final int upperIndex = page.ceil();
+    final double lowerOffset = getOffsetForIndex(lowerIndex);
+    final double upperOffset = getOffsetForIndex(upperIndex);
+
+    final double fraction = page - lowerIndex;
+    return lowerOffset + (upperOffset - lowerOffset) * fraction;
+  }
+
+  void _onPageScroll() {
+    if (!_pageController.hasClients) return;
+    final double? page = _pageController.page;
+    if (page == null) return;
+
+    final int roundedIndex = page.round();
+    if (roundedIndex != _selectedCategory.value) {
+      _selectedCategory.value = roundedIndex;
+    }
+
+    if (_tabsScrollController.hasClients) {
+      final double offset = _getScrollOffsetForPage(page);
+      _tabsScrollController.jumpTo(
+        offset.clamp(0.0, _tabsScrollController.position.maxScrollExtent),
+      );
+    }
   }
 
   List<Store> _filterStoresByCategory(List<Store> stores, int index) {
@@ -373,10 +393,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     controller: _pageController,
                     itemCount: _categories.length,
                     onPageChanged: (index) {
-                      setState(() {
-                        _selectedCategory = index;
-                      });
-                      _scrollToCategoryTab(index);
+                      _selectedCategory.value = index;
                     },
                     itemBuilder: (context, index) {
                       if (index == 0) {
@@ -615,108 +632,113 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildCategoryTabs() {
-    final bool isFavoriteActive = _selectedCategory == 0;
+    return ValueListenableBuilder<int>(
+      valueListenable: _selectedCategory,
+      builder: (context, activeIndex, child) {
+        final bool isFavoriteActive = activeIndex == 0;
 
-    return SizedBox(
-      height: 44,
-      child: Row(
-        children: [
-          // 1. Pinned Favorites Heart Tab (Fixed on the far left)
-          InkWell(
-            onTap: () {
-              _pageController.animateToPage(
-                0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            },
-            child: Container(
-              width: 56,
-              height: double.infinity,
-              alignment: Alignment.center,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: Icon(
-                        isFavoriteActive ? Icons.favorite : Icons.favorite,
-                        color: isFavoriteActive
-                            ? Colors.red
-                            : const Color(0xFF5F6368),
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: 3,
-                    width: 24,
-                    color: isFavoriteActive ? Colors.red : Colors.transparent,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 2. Vertical Divider
-          Container(width: 1, height: 20, color: const Color(0xFFDDDDDD)),
-
-          // 3. Scrollable List of Categories (Explore, Latest, etc.)
-          Expanded(
-            child: ListView.builder(
-              controller: _tabsScrollController,
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              itemCount:
-                  _categories.length - 1, // Exclude Favorites from scroll list
-              itemBuilder: (context, index) {
-                final int categoryIndex =
-                    index + 1; // Map to Explore (1), Latest (2), etc.
-                final bool active = _selectedCategory == categoryIndex;
-
-                return InkWell(
-                  onTap: () {
-                    _pageController.animateToPage(
-                      categoryIndex,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Center(
-                            child: Text(
-                              _categories[categoryIndex],
-                              style: TextStyle(
-                                color: active
-                                    ? _brandBlue
-                                    : const Color(0xFF5F6368),
-                                fontWeight: active
-                                    ? FontWeight.w800
-                                    : FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
+        return SizedBox(
+          height: 44,
+          child: Row(
+            children: [
+              // 1. Pinned Favorites Heart Tab (Fixed on the far left)
+              InkWell(
+                onTap: () {
+                  _pageController.animateToPage(
+                    0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: Container(
+                  width: 56,
+                  height: double.infinity,
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: Icon(
+                            isFavoriteActive ? Icons.favorite : Icons.favorite,
+                            color: isFavoriteActive
+                                ? Colors.red
+                                : const Color(0xFF5F6368),
+                            size: 22,
                           ),
                         ),
-                        Container(
-                          height: 3,
-                          width: 28,
-                          color: active ? _brandBlue : Colors.transparent,
-                        ),
-                      ],
-                    ),
+                      ),
+                      Container(
+                        height: 3,
+                        width: 24,
+                        color: isFavoriteActive ? Colors.red : Colors.transparent,
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+
+              // 2. Vertical Divider
+              Container(width: 1, height: 20, color: const Color(0xFFDDDDDD)),
+
+              // 3. Scrollable List of Categories (Explore, Latest, etc.)
+              Expanded(
+                child: ListView.builder(
+                  controller: _tabsScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  itemCount:
+                      _categories.length - 1, // Exclude Favorites from scroll list
+                  itemBuilder: (context, index) {
+                    final int categoryIndex =
+                        index + 1; // Map to Explore (1), Latest (2), etc.
+                    final bool active = activeIndex == categoryIndex;
+
+                    return InkWell(
+                      onTap: () {
+                        _pageController.animateToPage(
+                          categoryIndex,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Center(
+                                child: Text(
+                                  _categories[categoryIndex],
+                                  style: TextStyle(
+                                    color: active
+                                        ? _brandBlue
+                                        : const Color(0xFF5F6368),
+                                    fontWeight: active
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              height: 3,
+                              width: 28,
+                              color: active ? _brandBlue : Colors.transparent,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
