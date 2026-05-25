@@ -106,20 +106,9 @@ class StoreCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    // Favorite Toggle Icon Button
-                    GestureDetector(
+                    FavoriteHeartButton(
+                      isFavorited: isFavorited,
                       onTap: onFavoriteToggle,
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.all(2.0),
-                        child: Icon(
-                          isFavorited ? Icons.favorite : Icons.favorite_border,
-                          size: 20,
-                          color: isFavorited
-                              ? Colors.red
-                              : const Color(0xFF8C96A3),
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -182,6 +171,87 @@ class StoreCard extends StatelessWidget {
           color: fgColor,
           fontSize: 10.5,
           fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+class FavoriteHeartButton extends StatefulWidget {
+  final bool isFavorited;
+  final VoidCallback? onTap;
+
+  const FavoriteHeartButton({
+    super.key,
+    required this.isFavorited,
+    this.onTap,
+  });
+
+  @override
+  State<FavoriteHeartButton> createState() => _FavoriteHeartButtonState();
+}
+
+class _FavoriteHeartButtonState extends State<FavoriteHeartButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 1.4)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 50,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.4, end: 1.0)
+            .chain(CurveTween(curve: Curves.bounceOut)),
+        weight: 50,
+      ),
+    ]).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(covariant FavoriteHeartButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isFavorited && !oldWidget.isFavorited) {
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        if (widget.onTap != null) {
+          widget.onTap!();
+        }
+        if (!widget.isFavorited) {
+          _controller.forward(from: 0.0);
+        }
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(2.0),
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: Icon(
+            widget.isFavorited ? Icons.favorite : Icons.favorite_border,
+            size: 20,
+            color: widget.isFavorited ? Colors.red : const Color(0xFF8C96A3),
+          ),
         ),
       ),
     );

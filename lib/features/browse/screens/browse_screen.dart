@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../flyer/data/flyer_repository.dart';
 import '../../flyer/models/store.dart';
@@ -67,32 +68,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
     return name.length * 8.5 + 24.0;
   }
 
-  double _getScrollOffsetForPage(double page) {
-    if (page <= 0.0) return 0.0;
-
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double viewportWidth = screenWidth - 57.0;
-
-    double getOffsetForIndex(int idx) {
-      if (idx <= 0) return 0.0;
-      double tabStartOffset = 0.0;
-      for (int i = 1; i < idx; i++) {
-        tabStartOffset += _getTabWidth(i);
-      }
-      final double targetTabWidth = _getTabWidth(idx);
-      final double tabCenter = tabStartOffset + (targetTabWidth / 2.0);
-      return tabCenter - (viewportWidth / 2.0);
-    }
-
-    final int lowerIndex = page.floor();
-    final int upperIndex = page.ceil();
-    final double lowerOffset = getOffsetForIndex(lowerIndex);
-    final double upperOffset = getOffsetForIndex(upperIndex);
-
-    final double fraction = page - lowerIndex;
-    return lowerOffset + (upperOffset - lowerOffset) * fraction;
-  }
-
   void _onPageScroll() {
     if (!_pageController.hasClients) return;
     final double? page = _pageController.page;
@@ -101,14 +76,33 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final int roundedIndex = page.round();
     if (roundedIndex != _selectedCategory.value) {
       _selectedCategory.value = roundedIndex;
+      _scrollToCategoryTab(roundedIndex);
+    }
+  }
+
+  void _scrollToCategoryTab(int index) {
+    if (!_tabsScrollController.hasClients) return;
+
+    double targetOffset = 0.0;
+    if (index > 0) {
+      final double screenWidth = MediaQuery.of(context).size.width;
+      final double viewportWidth = screenWidth - 57.0;
+
+      double tabStartOffset = 0.0;
+      for (int i = 1; i < index; i++) {
+        tabStartOffset += _getTabWidth(i);
+      }
+      final double targetTabWidth = _getTabWidth(index);
+      final double tabCenter = tabStartOffset + (targetTabWidth / 2.0);
+
+      targetOffset = tabCenter - (viewportWidth / 2.0);
     }
 
-    if (_tabsScrollController.hasClients) {
-      final double offset = _getScrollOffsetForPage(page);
-      _tabsScrollController.jumpTo(
-        offset.clamp(0.0, _tabsScrollController.position.maxScrollExtent),
-      );
-    }
+    _tabsScrollController.animateTo(
+      targetOffset.clamp(0.0, _tabsScrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   List<Store> _filterStoresByCategory(List<Store> stores, int index) {
@@ -375,20 +369,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
               );
             }
             final stores = snap.data!;
-            return Column(
+            return Stack(
               children: [
-                Container(
-                  color: Colors.white,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildSearchBar(),
-                      _buildCategoryTabs(),
-                      const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                    ],
-                  ),
-                ),
-                Expanded(
+                // 1. Scrollable PageView content (rendered underneath)
+                Positioned.fill(
                   child: PageView.builder(
                     controller: _pageController,
                     itemCount: _categories.length,
@@ -402,7 +386,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         if (favStores.isEmpty) {
                           return _buildEmptyFavorites();
                         }
-                        return _buildStoreGrid(favStores, 'Your Favorites');
+                        return _buildStoreGrid(favStores, 'Your Favorites', 0);
                       } else if (index == 2) {
                         // Latest
                         return _buildLatest(stores);
@@ -416,9 +400,32 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         if (index > 3 && filtered.isEmpty) {
                           return _buildEmptyCategory(categoryName);
                         }
-                        return _buildStoreGrid(filtered, title);
+                        return _buildStoreGrid(filtered, title, index);
                       }
                     },
+                  ),
+                ),
+
+                // 2. Premium Frosted Glassmorphic floating top header bar!
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                      child: Container(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildSearchBar(),
+                            _buildCategoryTabs(),
+                            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -632,35 +639,35 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildCategoryTabs() {
-    return ValueListenableBuilder<int>(
-      valueListenable: _selectedCategory,
-      builder: (context, activeIndex, child) {
-        final bool isFavoriteActive = activeIndex == 0;
-
-        return SizedBox(
-          height: 44,
-          child: Row(
-            children: [
-              // 1. Pinned Favorites Heart Tab (Fixed on the far left)
-              InkWell(
-                onTap: () {
-                  _pageController.animateToPage(
-                    0,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-                child: Container(
-                  width: 56,
-                  height: double.infinity,
-                  alignment: Alignment.center,
-                  child: Column(
+    return Container(
+      height: 44,
+      color: Colors.white,
+      child: Row(
+        children: [
+          // 1. Pinned Favorites Tab
+          InkWell(
+            onTap: () {
+              _pageController.animateToPage(
+                0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            },
+            child: Container(
+              width: 56,
+              height: double.infinity,
+              alignment: Alignment.center,
+              child: ValueListenableBuilder<int>(
+                valueListenable: _selectedCategory,
+                builder: (context, activeIndex, _) {
+                  final bool isFavoriteActive = activeIndex == 0;
+                  return Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Center(
                           child: Icon(
-                            isFavoriteActive ? Icons.favorite : Icons.favorite,
+                            Icons.favorite,
                             color: isFavoriteActive
                                 ? Colors.red
                                 : const Color(0xFF5F6368),
@@ -668,49 +675,60 @@ class _BrowseScreenState extends State<BrowseScreen> {
                           ),
                         ),
                       ),
-                      Container(
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
                         height: 3,
-                        width: 24,
-                        color: isFavoriteActive ? Colors.red : Colors.transparent,
+                        width: isFavoriteActive ? 24.0 : 0.0,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
                       ),
                     ],
-                  ),
-                ),
+                  );
+                },
               ),
+            ),
+          ),
 
-              // 2. Vertical Divider
-              Container(width: 1, height: 20, color: const Color(0xFFDDDDDD)),
+          // 2. Vertical Divider
+          Container(
+            width: 1,
+            height: 20,
+            color: const Color(0xFFDDDDDD),
+          ),
 
-              // 3. Scrollable List of Categories (Explore, Latest, etc.)
-              Expanded(
-                child: ListView.builder(
-                  controller: _tabsScrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  itemCount:
-                      _categories.length - 1, // Exclude Favorites from scroll list
-                  itemBuilder: (context, index) {
-                    final int categoryIndex =
-                        index + 1; // Map to Explore (1), Latest (2), etc.
-                    final bool active = activeIndex == categoryIndex;
-
-                    return InkWell(
-                      onTap: () {
-                        _pageController.animateToPage(
-                          categoryIndex,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Padding(
+          // 3. Scrollable List of Categories (with horizontal expandable lines)
+          Expanded(
+            child: ListView.builder(
+              controller: _tabsScrollController,
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              itemCount: _categories.length - 1,
+              itemBuilder: (context, index) {
+                final int categoryIndex = index + 1;
+                return InkWell(
+                  onTap: () {
+                    _pageController.animateToPage(
+                      categoryIndex,
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                    );
+                  },
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _selectedCategory,
+                    builder: (context, activeIndex, _) {
+                      final bool active = activeIndex == categoryIndex;
+                      return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Center(
-                                child: Text(
-                                  _categories[categoryIndex],
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 250),
                                   style: TextStyle(
                                     color: active
                                         ? _brandBlue
@@ -720,56 +738,65 @@ class _BrowseScreenState extends State<BrowseScreen> {
                                         : FontWeight.w600,
                                     fontSize: 14,
                                   ),
+                                  child: Text(_categories[categoryIndex]),
                                 ),
                               ),
                             ),
-                            Container(
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeInOut,
                               height: 3,
-                              width: 28,
-                              color: active ? _brandBlue : Colors.transparent,
+                              width: active ? 28.0 : 0.0,
+                              decoration: BoxDecoration(
+                                color: _brandBlue,
+                                borderRadius: BorderRadius.circular(1.5),
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
   Widget _buildEmptyFavorites() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            const Text(
-              'No Favorites Yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+    return Padding(
+      padding: const EdgeInsets.only(top: 103.0),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              const Text(
+                'No Favorites Yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Tap the heart icon on any flyer to save it to your favorites list.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                height: 1.35,
+              const SizedBox(height: 8),
+              Text(
+                'Tap the heart icon on any flyer to save it to your favorites list.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.35,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -787,6 +814,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.only(top: 103.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -797,7 +825,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               child: _inlineEmpty('No upcoming flyers'),
             )
           else
-            _storeGridView(upcoming),
+            _storeGridView(upcoming, 2),
           const SizedBox(height: 16),
           _sectionHeader('New This Week'),
           if (newThisWeek.isEmpty)
@@ -806,54 +834,66 @@ class _BrowseScreenState extends State<BrowseScreen> {
               child: _inlineEmpty('Nothing new this week'),
             )
           else
-            _storeGridView(newThisWeek),
+            _storeGridView(newThisWeek, 2),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _buildStoreGrid(List<Store> stores, String headerLabel) {
+  Widget _buildStoreGrid(List<Store> stores, String headerLabel, int pageIndex) {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.only(top: 103.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _sectionHeader(headerLabel),
           const SizedBox(height: 4),
-          _storeGridView(stores),
+          _storeGridView(stores, pageIndex),
           const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _storeGridView(List<Store> stores) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      childAspectRatio: 0.74,
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      children: [
-        for (int i = 0; i < stores.length; i++)
-          StoreCard(
-            store: stores[i],
-            isFavorited: _favoritedStoreIds.contains(stores[i].id),
-            onFavoriteToggle: () {
-              setState(() {
-                if (_favoritedStoreIds.contains(stores[i].id)) {
-                  _favoritedStoreIds.remove(stores[i].id);
-                } else {
-                  _favoritedStoreIds.add(stores[i].id);
-                }
-              });
-            },
-            onTap: () => _openStore(stores, i),
-          ),
-      ],
+  Widget _storeGridView(List<Store> stores, int pageIndex) {
+    return ValueListenableBuilder<int>(
+      valueListenable: _selectedCategory,
+      builder: (context, activeCategory, _) {
+        final bool isPageActive = pageIndex == activeCategory;
+
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 0.74,
+          mainAxisSpacing: 14,
+          crossAxisSpacing: 14,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          children: [
+            for (int i = 0; i < stores.length; i++)
+              StaggeredGridEntry(
+                key: ValueKey('${stores[i].id}_${isPageActive ? "active" : "inactive"}'),
+                index: i,
+                child: StoreCard(
+                  store: stores[i],
+                  isFavorited: _favoritedStoreIds.contains(stores[i].id),
+                  onFavoriteToggle: () {
+                    setState(() {
+                      if (_favoritedStoreIds.contains(stores[i].id)) {
+                        _favoritedStoreIds.remove(stores[i].id);
+                      } else {
+                        _favoritedStoreIds.add(stores[i].id);
+                      }
+                    });
+                  },
+                  onTap: () => _openStore(stores, i),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
@@ -910,34 +950,37 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildEmptyCategory(String categoryName) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.storefront_outlined, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No $categoryName flyers found',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+    return Padding(
+      padding: const EdgeInsets.only(top: 103.0),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.storefront_outlined, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'No $categoryName flyers found',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E293B),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'We update our flyers daily. Please check back later or try another category.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                height: 1.35,
+              const SizedBox(height: 8),
+              Text(
+                'We update our flyers daily. Please check back later or try another category.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.35,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -993,6 +1036,37 @@ class _BrowseScreenState extends State<BrowseScreen> {
           label: 'Lists',
         ),
       ],
+    );
+  }
+}
+
+class StaggeredGridEntry extends StatelessWidget {
+  final int index;
+  final Widget child;
+
+  const StaggeredGridEntry({
+    super.key,
+    required this.index,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final int delayMs = (index % 6) * 50;
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + delayMs),
+      curve: Curves.easeOutQuad,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0.0, (1.0 - value) * 16.0),
+            child: child,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }
