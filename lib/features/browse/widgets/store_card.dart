@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/models/store.dart';
 
 enum CardStatus { newBadge, untilText, previewBadge, expiringText }
@@ -127,27 +128,40 @@ class StoreCard extends StatelessWidget {
                             color: Colors.grey,
                           ),
                         )
-                      : CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.topCenter,
-                          placeholder: (_, _) => const Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFF0071CE),
+                      : LayoutBuilder(
+                          builder: (ctx, c) {
+                            final double dpr =
+                                MediaQuery.of(ctx).devicePixelRatio;
+                            final int targetW =
+                                (c.maxWidth * dpr).clamp(200, 800).toInt();
+                            return CachedNetworkImage(
+                              imageUrl: CloudinaryUrl.sized(
+                                imageUrl,
+                                width: targetW,
                               ),
-                            ),
-                          ),
-                          errorWidget: (_, _, _) => const Center(
-                            child: Icon(
-                              Icons.broken_image_outlined,
-                              size: 24,
-                              color: Colors.grey,
-                            ),
-                          ),
+                              fit: BoxFit.cover,
+                              alignment: Alignment.topCenter,
+                              memCacheWidth: targetW,
+                              fadeInDuration: const Duration(milliseconds: 120),
+                              placeholder: (_, _) => const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF0071CE),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (_, _, _) => const Center(
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 24,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                 ),
               ),

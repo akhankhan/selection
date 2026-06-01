@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class SignInScreen extends StatelessWidget {
@@ -485,6 +486,34 @@ class SignInScreen extends StatelessWidget {
     );
   }
 
+  /// Creates the Firestore `users/{uid}` document on first sign-in, or
+  /// updates the profile + lastSignInAt on subsequent sign-ins. The admin
+  /// panel reads from this collection — without this, signed-in users do
+  /// not appear in the admin Users screen.
+  Future<void> _upsertUserDoc(User? user) async {
+    if (user == null) return;
+    final ref = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    try {
+      final snap = await ref.get();
+      final profile = <String, dynamic>{
+        'email': user.email,
+        'displayName': user.displayName,
+        'photoUrl': user.photoURL,
+        'lastSignInAt': FieldValue.serverTimestamp(),
+      };
+      if (!snap.exists) {
+        profile['createdAt'] = FieldValue.serverTimestamp();
+        await ref.set(profile);
+        debugPrint('[Firestore] Created users/${user.uid}');
+      } else {
+        await ref.update(profile);
+        debugPrint('[Firestore] Updated users/${user.uid}');
+      }
+    } catch (e) {
+      debugPrint('[Firestore] upsert failed: $e');
+    }
+  }
+
   void _handleLogin(BuildContext context, String provider) async {
     if (provider != 'Google') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -531,6 +560,8 @@ class SignInScreen extends StatelessWidget {
       final UserCredential userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
       debugPrint('[Google Sign-In] Firebase Sign-In successful! User: ${userCredential.user?.displayName} (${userCredential.user?.email})');
+
+      await _upsertUserDoc(userCredential.user);
 
       _isLoading.value = false;
 

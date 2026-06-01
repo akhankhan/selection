@@ -45,6 +45,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
   late PageController _pageController;
   final ScrollController _tabsScrollController = ScrollController();
 
+  /// Memoized per-category filter result. Keyed by category index, valid as
+  /// long as [_filterCacheStoresId] matches the current `stores` list
+  /// identity. Toggling a favorite or receiving a new stores snapshot
+  /// invalidates the cache.
+  final Map<int, List<Store>> _filterCache = {};
+  Object? _filterCacheStoresId;
+
   @override
   void initState() {
     super.initState();
@@ -106,6 +113,23 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   List<Store> _filterStoresByCategory(List<Store> stores, int index) {
+    if (!identical(stores, _filterCacheStoresId)) {
+      _filterCache.clear();
+      _filterCacheStoresId = stores;
+    }
+    // Favorites is the one case the cache must skip — toggling a heart
+    // doesn't change the stores list identity, but the filtered subset
+    // changes. The other categories are pure functions of (stores, index).
+    if (index != 0) {
+      final cached = _filterCache[index];
+      if (cached != null) return cached;
+    }
+    final result = _computeFilteredStores(stores, index);
+    if (index != 0) _filterCache[index] = result;
+    return result;
+  }
+
+  List<Store> _computeFilteredStores(List<Store> stores, int index) {
     if (index == 0) {
       return stores.where((s) => _favoritedStoreIds.contains(s.id)).toList();
     }
@@ -406,23 +430,33 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   ),
                 ),
 
-                // 2. Premium Frosted Glassmorphic floating top header bar!
+                // 2. Premium frosted glassmorphic floating top header bar.
+                // Sigma is kept modest (6, not 10) — Gaussian blur cost scales
+                // with sigma², so 6 is roughly a third the per-frame work
+                // while still reading as a frosted pane. The inner static
+                // controls live behind a RepaintBoundary so they don't get
+                // recomposited every time the blur re-evaluates.
                 Positioned(
                   top: 0,
                   left: 0,
                   right: 0,
                   child: ClipRect(
                     child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                      filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
                       child: Container(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildSearchBar(),
-                            _buildCategoryTabs(),
-                            const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                          ],
+                        color: Colors.white.withValues(alpha: 0.92),
+                        child: RepaintBoundary(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildSearchBar(),
+                              _buildCategoryTabs(),
+                              const Divider(
+                                height: 1,
+                                color: Color(0xFFEEEEEE),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),

@@ -1,12 +1,18 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../data/cloudinary_url.dart';
 import '../models/flyer_item.dart';
 import '../models/store.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
+
+/// Render width (in CSS pixels) we ask Cloudinary to serve for a full-size
+/// flyer page. Anything below this is upscaled at decode time by the GPU;
+/// anything above wastes bandwidth and memory for a phone display.
+const int _kFlyerPageWidth = 1100;
 
 class FlyerViewerScreen extends StatefulWidget {
   final List<Store> stores;
@@ -37,9 +43,18 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   /// One draw-on animation controller per highlighted item.
   final Map<String, AnimationController> _highlightControllers = {};
 
-  /// Decoded flyer images keyed by image URL, used to crop real product
-  /// photos for the deal sheet.
-  final Map<String, ui.Image> _flyerImages = {};
+  /// Decoded flyer images keyed by the sized Cloudinary URL, used to crop
+  /// real product photos for the deal sheet. Lives behind a ValueNotifier so
+  /// only widgets that actually need pixel data (the deal sheet, list
+  /// thumbnails) rebuild when a new image finishes decoding.
+  final ValueNotifier<Map<String, ui.Image>> _flyerImages =
+      ValueNotifier<Map<String, ui.Image>>({});
+
+  /// Pending decodes so swiping back to a store doesn't re-trigger work.
+  final Set<String> _pendingImageUrls = {};
+
+  String _renderUrlForPage(FlyerPage page) =>
+      CloudinaryUrl.sized(page.imageUrl, width: _kFlyerPageWidth);
 
   // Height of the in-scroll tab bar; used to offset page calculations.
   static const double _tabBarHeight = 48;
@@ -59,11 +74,26 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       _stores.length,
       (_) => ScrollController(),
     );
-    _loadFlyerImages();
+    _warmImagesAround(_currentStore);
 
     // Add shopping list listener
     ShoppingListManager().addListener(_onShoppingListChanged);
     _syncHighlights();
+  }
+
+  /// Decode flyer pages for the current store and its immediate neighbours,
+  /// so swiping reveals them without a black frame, but distant stores never
+  /// chew RAM unless visited.
+  void _warmImagesAround(int storeIdx) {
+    final List<int> targets = [
+      storeIdx - 1,
+      storeIdx,
+      storeIdx + 1,
+    ];
+    for (final i in targets) {
+      if (i < 0 || i >= _stores.length) continue;
+      _loadStoreImages(_stores[i]);
+    }
   }
 
   void _onShoppingListChanged() {
@@ -129,32 +159,39 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     }
   }
 
-  void _loadFlyerImages() {
-    for (final store in _stores) {
-      for (final page in store.pages) {
-        if (page.imageUrl.isEmpty || _flyerImages.containsKey(page.imageUrl)) {
-          continue;
-        }
-        try {
-          final imageProvider = CachedNetworkImageProvider(page.imageUrl);
-          final stream = imageProvider.resolve(ImageConfiguration.empty);
-          stream.addListener(
-            ImageStreamListener(
-              (ImageInfo info, bool _) {
-                if (mounted) {
-                  setState(() {
-                    _flyerImages[page.imageUrl] = info.image;
-                  });
-                }
-              },
-              onError: (exception, stackTrace) {
-                debugPrint('Failed to cache flyer image: $exception');
-              },
-            ),
-          );
-        } catch (_) {
-          // Skip; tap-handling and the deal sheet handle a missing image.
-        }
+  void _loadStoreImages(Store store) {
+    for (final page in store.pages) {
+      if (page.imageUrl.isEmpty) continue;
+      final String url = _renderUrlForPage(page);
+      if (_flyerImages.value.containsKey(url) ||
+          _pendingImageUrls.contains(url)) {
+        continue;
+      }
+      _pendingImageUrls.add(url);
+      try {
+        final imageProvider = CachedNetworkImageProvider(url);
+        final stream = imageProvider.resolve(ImageConfiguration.empty);
+        late final ImageStreamListener listener;
+        listener = ImageStreamListener(
+          (ImageInfo info, bool _) {
+            if (!mounted) return;
+            // Replace map identity so listeners notice the change.
+            final next = Map<String, ui.Image>.from(_flyerImages.value);
+            next[url] = info.image;
+            _flyerImages.value = next;
+            _pendingImageUrls.remove(url);
+            stream.removeListener(listener);
+          },
+          onError: (exception, stackTrace) {
+            _pendingImageUrls.remove(url);
+            stream.removeListener(listener);
+            debugPrint('Failed to cache flyer image: $exception');
+          },
+        );
+        stream.addListener(listener);
+      } catch (_) {
+        _pendingImageUrls.remove(url);
+        // Tap-handling and the deal sheet both tolerate a missing image.
       }
     }
   }
@@ -169,6 +206,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     for (final c in _highlightControllers.values) {
       c.dispose();
     }
+    _flyerImages.dispose();
     super.dispose();
   }
 
@@ -212,36 +250,63 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       setState(() => _highlights.add(tapped));
       controller.forward();
 
+      final String renderUrl = _renderUrlForPage(page);
       // Add to shopping list
-      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imageUrl]);
+      manager.addFlyerItem(tapped, store.name, _flyerImages.value[renderUrl]);
 
-      _showItemBottomSheet(tapped, page.imageUrl);
+      _showItemBottomSheet(tapped, renderUrl);
     } else if (existing.status == AnimationStatus.reverse) {
+      final String renderUrl = _renderUrlForPage(page);
       existing.forward();
-      manager.addFlyerItem(tapped, store.name, _flyerImages[page.imageUrl]);
-      _showItemBottomSheet(tapped, page.imageUrl);
+      manager.addFlyerItem(tapped, store.name, _flyerImages.value[renderUrl]);
+      _showItemBottomSheet(tapped, renderUrl);
     } else {
       existing.reverse();
     }
   }
 
-  /// Builds the hand-drawn circle overlays for one page.
-  List<Widget> _buildHighlights(int storeIdx, int pageIdx) {
+  // Constants for the highlight RepaintBoundary sizing. We pad each side by
+  // [_highlightPad] so the wobbly stroke can poke outside the bbox without
+  // being clipped, and pass the painter a normalized rect that locates the
+  // item back inside that padded canvas.
+  static const double _highlightPad = 0.05;
+  static final Rect _itemRectInPaddedCanvas = Rect.fromLTWH(
+    _highlightPad / (1 + 2 * _highlightPad),
+    _highlightPad / (1 + 2 * _highlightPad),
+    1 / (1 + 2 * _highlightPad),
+    1 / (1 + 2 * _highlightPad),
+  );
+
+  /// Builds the hand-drawn circle overlays for one page, each positioned
+  /// over just the item's bounding box (plus a small pad so the wobbly
+  /// stroke isn't clipped). This keeps each circle's RepaintBoundary
+  /// region tiny — Flutter only repaints that rectangle on each animation
+  /// frame, not the full flyer page.
+  List<Widget> _buildHighlights(
+    int storeIdx,
+    int pageIdx,
+    double pageWidth,
+    double pageHeight,
+  ) {
     final Set<FlyerItem> pageItems = _stores[storeIdx].pages[pageIdx].items
         .toSet();
     return _highlights.where(pageItems.contains).map((item) {
       final controller = _highlightControllers[item.id]!;
-      return Positioned.fill(
+      final Rect bbox = item.boundingBox;
+      final double padW = bbox.width * _highlightPad;
+      final double padH = bbox.height * _highlightPad;
+      return Positioned(
+        left: (bbox.left * pageWidth) - padW * pageWidth,
+        top: (bbox.top * pageHeight) - padH * pageHeight,
+        width: bbox.width * pageWidth + 2 * padW * pageWidth,
+        height: bbox.height * pageHeight + 2 * padH * pageHeight,
         child: IgnorePointer(
           child: RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: controller,
-              builder: (_, _) => CustomPaint(
-                painter: HandDrawnCirclePainter(
-                  normalizedRect: item.boundingBox,
-                  progress: Curves.easeOutCubic.transform(controller.value),
-                  seed: item.id.hashCode,
-                ),
+            child: CustomPaint(
+              painter: HandDrawnCirclePainter(
+                normalizedRect: _itemRectInPaddedCanvas,
+                animation: controller,
+                seed: item.id.hashCode,
               ),
             ),
           ),
@@ -409,6 +474,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     double height,
   ) {
     final FlyerPage page = _stores[storeIdx].pages[pageIdx];
+    final double dpr = MediaQuery.of(context).devicePixelRatio;
+    final int targetW = (width * dpr).clamp(400, _kFlyerPageWidth).toInt();
+    final String renderUrl = _renderUrlForPage(page);
     return SizedBox(
       width: width,
       height: height,
@@ -424,19 +492,21 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             Positioned.fill(
               child: page.imageUrl.isEmpty
                   ? const ColoredBox(color: Color(0xFFF2F3F5))
-                  : Image.network(
-                      page.imageUrl,
-                      fit: BoxFit.fill,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                      errorBuilder: (_, _, _) => const Center(
-                        child: Icon(Icons.broken_image_outlined, size: 48),
+                  : RepaintBoundary(
+                      child: CachedNetworkImage(
+                        imageUrl: renderUrl,
+                        fit: BoxFit.fill,
+                        memCacheWidth: targetW,
+                        fadeInDuration: const Duration(milliseconds: 120),
+                        placeholder: (_, _) =>
+                            const Center(child: CircularProgressIndicator()),
+                        errorWidget: (_, _, _) => const Center(
+                          child: Icon(Icons.broken_image_outlined, size: 48),
+                        ),
                       ),
                     ),
             ),
-            ..._buildHighlights(storeIdx, pageIdx),
+            ..._buildHighlights(storeIdx, pageIdx, width, height),
           ],
         ),
       ),
@@ -456,6 +526,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           _currentPage = 0;
           _syncHighlights();
         });
+        _warmImagesAround(index);
       },
       itemBuilder: (context, storeIdx) => _buildStoreScroll(storeIdx),
     );
@@ -497,7 +568,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     );
   }
 
-  void _showItemBottomSheet(FlyerItem item, String imageUrl) {
+  void _showItemBottomSheet(FlyerItem item, String renderUrl) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -508,8 +579,11 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       // Transparent barrier: the flyer (and the yellow circle) stay in full
       // colour behind the sheet instead of being greyed out.
       barrierColor: Colors.transparent,
-      builder: (ctx) =>
-          DealSheet(item: item, flyerImage: _flyerImages[imageUrl]),
+      builder: (ctx) => ValueListenableBuilder<Map<String, ui.Image>>(
+        valueListenable: _flyerImages,
+        builder: (_, images, _) =>
+            DealSheet(item: item, flyerImage: images[renderUrl]),
+      ),
     );
   }
 
