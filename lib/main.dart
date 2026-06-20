@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -6,10 +8,14 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/storage/auto_delete_preferences_store.dart';
 import 'core/storage/favorites_store.dart';
 import 'core/storage/location_store.dart';
+import 'core/storage/loyalty_cards_store.dart';
+import 'core/storage/notification_preferences_store.dart';
 import 'features/browse/screens/browse_screen.dart';
 import 'features/lists/models/shopping_list_manager.dart';
+import 'features/settings/services/push_notification_service.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -18,7 +24,11 @@ Future<void> main() async {
   await ThemeController.instance.load();
   await FavoritesStore.instance.load();
   await LocationStore.instance.load();
+  await AutoDeletePreferencesStore.instance.load();
+  await LoyaltyCardsStore.instance.load();
+  await NotificationPreferencesStore.instance.load();
   await ShoppingListManager.instance.load();
+  await PushNotificationService.instance.initialize();
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
@@ -44,9 +54,14 @@ Future<void> _syncUserToFirestore(User? user) async {
     };
     if (!snap.exists) {
       profile['createdAt'] = FieldValue.serverTimestamp();
+      profile['notificationsEnabled'] =
+          NotificationPreferencesStore.instance.enabled;
       await ref.set(profile);
     } else {
       await ref.update(profile);
+    }
+    if (NotificationPreferencesStore.instance.enabled) {
+      unawaited(PushNotificationService.instance.registerForPush());
     }
   } catch (e) {
     debugPrint('[Firestore] user sync failed: $e');

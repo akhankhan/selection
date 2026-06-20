@@ -1,1 +1,48 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"selection-admin","appId":"1:699002286605:android:a7ad79df8f0f5ee559db44","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"selection-admin","appId":"1:699002286605:ios:b0403673cee7406d59db44","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"selection-admin","configurations":{"android":"1:699002286605:android:a7ad79df8f0f5ee559db44","ios":"1:699002286605:ios:b0403673cee7406d59db44"}}}}}}
+{
+  "hosting": {
+    "public": "hosting/public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**/*.@(html|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "selection-admin",
+          "appId": "1:699002286605:android:a7ad79df8f0f5ee559db44",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "selection-admin",
+          "appId": "1:699002286605:ios:b0403673cee7406d59db44",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "selection-admin",
+          "configurations": {
+            "android": "1:699002286605:android:a7ad79df8f0f5ee559db44",
+            "ios": "1:699002286605:ios:b0403673cee7406d59db44"
+          }
+        }
+      }
+    }
+  }
+}

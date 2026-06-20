@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/storage/loyalty_cards_store.dart';
+import '../models/loyalty_card.dart';
 
 class MyCardsScreen extends StatefulWidget {
   const MyCardsScreen({super.key});
@@ -12,28 +14,7 @@ class MyCardsScreen extends StatefulWidget {
 class _MyCardsScreenState extends State<MyCardsScreen> {
   static const Color _brandBlue = Color(0xFF0071CE);
 
-  // Initial list of loyalty cards
-  final List<Map<String, dynamic>> _cards = [
-    {
-      'id': '1',
-      'merchant': 'Scene+',
-      'cardNumber': '9802 3421 9887 5612',
-      'color1': const Color(0xFF003893),
-      'color2': const Color(0xFF0056D6),
-      'logoLetter': 'S',
-      'textColor': Colors.white,
-    },
-    {
-      'id': '2',
-      'merchant': 'PC Optimum',
-      'cardNumber': '3084 0938 1209 8452',
-      'color1': const Color(0xFFD22630),
-      'color2': const Color(0xFFFF5252),
-      'logoLetter': 'P',
-      'textColor': Colors.white,
-    },
-  ];
-
+  // Initial list of loyalty cards — persisted via LoyaltyCardsStore
   final List<Map<String, dynamic>> _availableMerchants = [
     {
       'name': 'Walmart Rewards',
@@ -313,7 +294,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
                           if (numberController.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -334,19 +315,21 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                             formatted += raw[i];
                           }
 
-                          setState(() {
-                            _cards.add({
-                              'id': DateTime.now().millisecondsSinceEpoch
-                                  .toString(),
-                              'merchant': selectedMerchant!['name'],
-                              'cardNumber': formatted,
-                              'color1': selectedMerchant!['color1'],
-                              'color2': selectedMerchant!['color2'],
-                              'logoLetter': selectedMerchant!['logoLetter'],
-                              'textColor': Colors.white,
-                            });
-                          });
+                          await LoyaltyCardsStore.instance.add(
+                            LoyaltyCard(
+                              id: DateTime.now().millisecondsSinceEpoch.toString(),
+                              merchant: selectedMerchant!['name'] as String,
+                              cardNumber: formatted,
+                              color1Value:
+                                  (selectedMerchant!['color1'] as Color).toARGB32(),
+                              color2Value:
+                                  (selectedMerchant!['color2'] as Color).toARGB32(),
+                              logoLetter:
+                                  selectedMerchant!['logoLetter'] as String,
+                            ),
+                          );
 
+                          if (!context.mounted) return;
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -385,7 +368,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
     );
   }
 
-  void _deleteCard(int index) {
+  void _deleteCard(int index, String merchantName) {
     showDialog(
       context: context,
       builder: (context) {
@@ -401,7 +384,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
             ),
           ),
           content: Text(
-            'Are you sure you want to remove your ${_cards[index]['merchant']} loyalty card?',
+            'Are you sure you want to remove your $merchantName loyalty card?',
             style: TextStyle(color: appTheme.subtitle),
           ),
           actions: [
@@ -410,10 +393,9 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
               child: Text('Cancel', style: TextStyle(color: appTheme.subtitle)),
             ),
             TextButton(
-              onPressed: () {
-                setState(() {
-                  _cards.removeAt(index);
-                });
+              onPressed: () async {
+                await LoyaltyCardsStore.instance.removeAt(index);
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Card removed successfully')),
@@ -437,7 +419,14 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
   Widget build(BuildContext context) {
     final appTheme = context.appTheme;
 
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: LoyaltyCardsStore.instance,
+      builder: (context, _) {
+        final cards = LoyaltyCardsStore.instance.cards
+            .map((card) => card.toUiMap())
+            .toList();
+
+        return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
@@ -449,7 +438,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
           child: Divider(height: 1, color: Theme.of(context).dividerColor),
         ),
       ),
-      body: _cards.isEmpty
+      body: cards.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -501,9 +490,9 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _cards.length,
+              itemCount: cards.length,
               itemBuilder: (context, index) {
-                final card = _cards[index];
+                final card = cards[index];
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Card(
@@ -517,7 +506,10 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                     ),
                     child: InkWell(
                       onTap: () => _showCardBarcode(card),
-                      onLongPress: () => _deleteCard(index),
+                      onLongPress: () => _deleteCard(
+                        index,
+                        card['merchant'] as String,
+                      ),
                       child: Container(
                         height: 170,
                         decoration: BoxDecoration(
@@ -602,7 +594,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                 );
               },
             ),
-      floatingActionButton: _cards.isNotEmpty
+      floatingActionButton: cards.isNotEmpty
           ? FloatingActionButton(
               onPressed: _addNewCard,
               backgroundColor: _brandBlue,
@@ -612,6 +604,8 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
               child: const Icon(Icons.add, color: Colors.white, size: 28),
             )
           : null,
+        );
+      },
     );
   }
 }

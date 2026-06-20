@@ -13,6 +13,7 @@ import '../../settings/screens/settings_screen.dart';
 import '../../settings/screens/help_support_screen.dart';
 import '../../settings/screens/my_cards_screen.dart';
 import '../../settings/screens/request_store_screen.dart';
+import 'edit_favorites_screen.dart';
 import '../widgets/store_card.dart';
 import '../widgets/search_tab_view.dart';
 
@@ -1075,8 +1076,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
           if (label == 'Your Favorites')
             GestureDetector(
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit Favorites tapped!')),
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const EditFavoritesScreen(),
+                  ),
                 );
               },
               child: Text(

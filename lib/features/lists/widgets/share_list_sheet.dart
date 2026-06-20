@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
+import '../services/shopping_list_share_service.dart';
 import '../../settings/screens/email_signin_screen.dart';
 import '../../settings/services/apple_sign_in_service.dart';
 
@@ -352,6 +353,43 @@ class ShareListSheet extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            try {
+                              await ShoppingListShareService.shareCurrentList();
+                              if (context.mounted) Navigator.of(context).pop();
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    e.toString().replaceFirst('StateError: ', ''),
+                                  ),
+                                  backgroundColor: context.brandBlue,
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icon(Icons.ios_share_rounded, color: context.brandBlue),
+                          label: Text(
+                            'Share list as text',
+                            style: TextStyle(
+                              color: context.brandBlue,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: context.brandBlue),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
@@ -556,19 +594,23 @@ class ShareListSheet extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text(
-                          'Invite link copied — sharing coming soon!',
+                  onPressed: () async {
+                    try {
+                      await ShoppingListShareService.shareCurrentList();
+                      if (context.mounted) Navigator.of(context).pop();
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(e.toString().replaceFirst('StateError: ', '')),
+                          backgroundColor: context.brandBlue,
                         ),
-                        backgroundColor: context.brandBlue,
-                      ),
-                    );
+                      );
+                    }
                   },
                   icon: const Icon(Icons.ios_share_rounded, size: 20),
                   label: const Text(
-                    'Invite a Friend',
+                    'Share Shopping List',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

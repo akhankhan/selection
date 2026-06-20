@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../../core/config/legal_documents_service.dart';
+import '../../../core/storage/auto_delete_preferences_store.dart';
+import '../../../core/storage/notification_preferences_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../browse/services/search_history_service.dart';
@@ -20,7 +23,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const Color _brandBlue = AppTheme.brandBlue;
 
   bool _acceptNotifications = true;
-  String _autoDeleteOption = 'Never (Default)';
+  AutoDeleteExpiredPolicy _autoDeletePolicy = AutoDeleteExpiredPolicy.never;
+
+  @override
+  void initState() {
+    super.initState();
+    NotificationPreferencesStore.instance.load().then((_) {
+      if (mounted) {
+        setState(() {
+          _acceptNotifications = NotificationPreferencesStore.instance.enabled;
+        });
+      }
+    });
+    AutoDeletePreferencesStore.instance.load().then((_) {
+      if (mounted) {
+        setState(() {
+          _autoDeletePolicy = AutoDeletePreferencesStore.instance.policy;
+        });
+      }
+    });
+    NotificationPreferencesStore.instance.addListener(_onNotificationPrefChanged);
+    AutoDeletePreferencesStore.instance.addListener(_onAutoDeleteChanged);
+  }
+
+  void _onAutoDeleteChanged() {
+    if (mounted) {
+      setState(() {
+        _autoDeletePolicy = AutoDeletePreferencesStore.instance.policy;
+      });
+    }
+  }
+
+  void _onNotificationPrefChanged() {
+    if (mounted) {
+      setState(() {
+        _acceptNotifications = NotificationPreferencesStore.instance.enabled;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    NotificationPreferencesStore.instance.removeListener(_onNotificationPrefChanged);
+    AutoDeletePreferencesStore.instance.removeListener(_onAutoDeleteChanged);
+    super.dispose();
+  }
+
+  void _openLegalDocument(LegalDocumentType type) {
+    LegalDocumentsService.instance.open(context, type);
+  }
 
   void _showThemePicker() {
     final currentTheme = ThemeController.instance.label;
@@ -77,28 +128,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Auto Delete Expired Items',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
-          content: RadioGroup<String>(
-            groupValue: _autoDeleteOption,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _autoDeleteOption = value);
-                Navigator.pop(context);
+          content: RadioGroup<AutoDeleteExpiredPolicy>(
+            groupValue: _autoDeletePolicy,
+            onChanged: (value) async {
+              if (value == null) return;
+              await AutoDeletePreferencesStore.instance.setPolicy(value);
+              final removed = ShoppingListManager.instance.purgeExpiredByPolicy(value);
+              if (!context.mounted) return;
+              setState(() => _autoDeletePolicy = value);
+              Navigator.pop(context);
+              if (removed > 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Removed $removed expired item${removed == 1 ? '' : 's'}.'),
+                    backgroundColor: _brandBlue,
+                  ),
+                );
               }
             },
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: ['Never (Default)', 'After 7 days', 'After 30 days'].map((
-                option,
-              ) {
+              children: AutoDeleteExpiredPolicy.values.map((policy) {
                 return ListTile(
-                  title: Text(option),
-                  leading: Radio<String>(
-                    value: option,
+                  title: Text(policy.label),
+                  leading: Radio<AutoDeleteExpiredPolicy>(
+                    value: policy,
                     activeColor: _brandBlue,
                   ),
-                  onTap: () {
-                    setState(() => _autoDeleteOption = option);
+                  onTap: () async {
+                    await AutoDeletePreferencesStore.instance.setPolicy(policy);
+                    final removed =
+                        ShoppingListManager.instance.purgeExpiredByPolicy(policy);
+                    if (!context.mounted) return;
+                    setState(() => _autoDeletePolicy = policy);
                     Navigator.pop(context);
+                    if (removed > 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Removed $removed expired item${removed == 1 ? '' : 's'}.',
+                          ),
+                          backgroundColor: _brandBlue,
+                        ),
+                      );
+                    }
                   },
                 );
               }).toList(),
@@ -400,8 +473,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle:
                 'Allow Flipp to notify you of the latest deals in your area',
             value: _acceptNotifications,
-            onChanged: (val) {
-              setState(() => _acceptNotifications = val);
+            onChanged: (val) async {
+              final enabled =
+                  await NotificationPreferencesStore.instance.setEnabled(val);
+              if (!context.mounted) return;
+              setState(() => _acceptNotifications = enabled);
+              if (val && !enabled) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Notification permission was denied. Enable alerts in device Settings to receive deal notifications.',
+                    ),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              } else if (enabled) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Push notifications enabled. You\'ll receive deal alerts for your area.',
+                    ),
+                    backgroundColor: _brandBlue,
+                  ),
+                );
+              }
             },
           ),
           _buildDivider(),
@@ -425,17 +520,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildCategoryHeader('Legal'),
           _buildTile(
             title: 'Terms Of Service',
-            onTap: () => _showMockPage('Terms Of Service'),
+            onTap: () => _openLegalDocument(LegalDocumentType.termsOfService),
           ),
           _buildDivider(),
           _buildTile(
             title: 'Enhanced Notice',
-            onTap: () => _showMockPage('Enhanced Notice'),
+            onTap: () => _openLegalDocument(LegalDocumentType.enhancedNotice),
           ),
           _buildDivider(),
           _buildTile(
             title: 'Privacy Policy',
-            onTap: () => _showMockPage('Privacy Policy'),
+            onTap: () => _openLegalDocument(LegalDocumentType.privacyPolicy),
           ),
 
           // Shopping List Section
@@ -455,7 +550,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildDivider(),
           _buildTile(
             title: 'Auto Delete Expired Shopping List Items',
-            subtitle: _autoDeleteOption,
+            subtitle: _autoDeletePolicy.label,
             onTap: _showAutoDeletePicker,
           ),
 

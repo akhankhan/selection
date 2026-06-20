@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/legal_documents_service.dart';
 import '../../../core/theme/app_theme_extension.dart';
 
 class HelpSupportScreen extends StatefulWidget {
@@ -40,6 +42,39 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           'Flyers are published based on the agreements and schedules of local retailers. If a store is missing, you can request it through our "Request a Store" form.',
     },
   ];
+
+  Future<void> _emailSupport() async {
+    final docs = await LegalDocumentsService.instance.load();
+    final uri = Uri(
+      scheme: 'mailto',
+      path: docs.supportEmail,
+      queryParameters: {
+        'subject': 'Selection App Support',
+      },
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Email us at ${docs.supportEmail}'),
+        backgroundColor: context.brandBlue,
+      ),
+    );
+  }
+
+  void _showLiveChatMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Live chat is coming soon. Please email us for now.',
+        ),
+        backgroundColor: context.brandBlue,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -283,16 +318,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Support ticket created. We will email you shortly!',
-                                ),
-                                backgroundColor: context.brandBlue,
-                              ),
-                            );
-                          },
+                          onPressed: _emailSupport,
                           icon: const Icon(Icons.email_outlined, size: 18),
                           label: const Text('Email Us'),
                           style: OutlinedButton.styleFrom(
@@ -307,16 +333,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Connecting to live chat agent...',
-                                ),
-                                backgroundColor: context.brandBlue,
-                              ),
-                            );
-                          },
+                          onPressed: _showLiveChatMessage,
                           icon: const Icon(
                             Icons.chat_bubble_outline,
                             size: 18,

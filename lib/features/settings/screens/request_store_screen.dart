@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
+import '../services/store_request_service.dart';
 
 class RequestStoreScreen extends StatefulWidget {
   const RequestStoreScreen({super.key});
@@ -19,16 +20,29 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
 
   bool _isSubmitting = false;
 
-  void _submitRequest() {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isSubmitting = true);
+  Future<void> _submitRequest() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      // Simulate network request
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (!mounted) return;
-        setState(() => _isSubmitting = false);
-        _showSuccessDialog();
-      });
+    setState(() => _isSubmitting = true);
+
+    try {
+      await StoreRequestService.instance.submit(
+        storeName: _storeNameController.text,
+        location: _locationController.text,
+        comments: _commentsController.text,
+      );
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      _showSuccessDialog();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not submit request. Please try again. ($e)'),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 

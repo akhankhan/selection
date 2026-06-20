@@ -59,12 +59,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBgAzuMGyLMDVs-yc6Z6ATecOmx4_B9uNw',
-    appId: '1:699002286605:ios:6384f268cd736f9059db44',
+    appId: '1:699002286605:ios:d02ea2ec9cf8c8ae59db44',
     messagingSenderId: '699002286605',
     projectId: 'selection-admin',
     storageBucket: 'selection-admin.firebasestorage.app',
     androidClientId: '699002286605-9ms8hsbev6mfbd5ss724rmai84bk4ikn.apps.googleusercontent.com',
-    iosClientId: '699002286605-s0e1h3f305up89jadki6ae85bnle8o25.apps.googleusercontent.com',
+    iosClientId: '699002286605-mj636am0m7lt2hr2ra0gs859sem6kaao.apps.googleusercontent.com',
     iosBundleId: 'com.menu2go.expressapp',
   );
 

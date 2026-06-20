@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
+    }
+
+    match /stores/{storeId}/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /legal_policies/{policyId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    match /store_requests/{requestId} {
+      allow create: if validStoreRequest(request.resource.data);
+      allow read, update, delete: if false;
+    }
+  }
+
+  function validStoreRequest(data) {
+    return data.keys().hasAll(['storeName', 'location', 'status', 'createdAt'])
+      && data.storeName is string
+      && data.storeName.size() > 0
+      && data.storeName.size() <= 200
+      && data.location is string
+      && data.location.size() > 0
+      && data.location.size() <= 200
+      && data.status == 'pending'
+      && (!('comments' in data) || (data.comments is string && data.comments.size() <= 2000));
+  }
+}

@@ -10,6 +10,7 @@ import '../services/shopping_list_storage.dart';
 import '../utils/flyer_date_parser.dart';
 import '../widgets/flyer_list_thumbnail.dart';
 import '../widgets/mock_thumbnails.dart';
+import '../../../core/storage/auto_delete_preferences_store.dart';
 
 class ShoppingListManager extends ChangeNotifier {
   ShoppingListManager._();
@@ -70,6 +71,11 @@ class ShoppingListManager extends ChangeNotifier {
 
     if (_findSection(_myListTitle) == null) {
       _sections.insert(0, ListSection(title: _myListTitle, items: []));
+    }
+
+    final removed = purgeExpiredByPolicy(AutoDeletePreferencesStore.instance.policy);
+    if (removed > 0) {
+      debugPrint('[ShoppingList] auto-removed $removed expired item(s)');
     }
 
     _loaded = true;
@@ -211,6 +217,28 @@ class ShoppingListManager extends ChangeNotifier {
     }
     _sections.removeWhere((s) => s.items.isEmpty && s.title != _myListTitle);
     _notifyAndPersist();
+    return removed;
+  }
+
+  int purgeExpiredByPolicy(AutoDeleteExpiredPolicy policy) {
+    final grace = policy.graceAfterExpiry;
+    if (grace == null) return 0;
+
+    final now = DateTime.now();
+    var removed = 0;
+    for (final section in _sections) {
+      final before = section.items.length;
+      section.items.removeWhere((item) {
+        final expiry = item.expiresAt;
+        if (expiry == null || !isFlyerExpired(expiry)) return false;
+        return now.difference(expiry) >= grace;
+      });
+      removed += before - section.items.length;
+    }
+    if (removed > 0) {
+      _sections.removeWhere((s) => s.items.isEmpty && s.title != _myListTitle);
+      _notifyAndPersist();
+    }
     return removed;
   }
 
