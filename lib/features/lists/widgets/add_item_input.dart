@@ -60,6 +60,11 @@ class AddItemInputState extends State<AddItemInput> {
     _focusNode.requestFocus();
   }
 
+  void dismiss() {
+    _focusNode.unfocus();
+    _controller.clear();
+  }
+
   void _submit() {
     final value = _controller.text.trim();
     if (value.isEmpty) {

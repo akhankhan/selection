@@ -24,6 +24,7 @@ class _ListsScreenState extends State<ListsScreen> {
   final ShoppingListManager _manager = ShoppingListManager();
   final GlobalKey<AddItemInputState> _addItemKey = GlobalKey();
   StreamSubscription<User?>? _authSubscription;
+  bool _showAddItemBar = false;
 
   @override
   void initState() {
@@ -53,7 +54,16 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   void _openAddItem([String? initialListTitle]) {
-    _addItemKey.currentState?.focusWithList(initialListTitle);
+    setState(() => _showAddItemBar = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _addItemKey.currentState?.focusWithList(initialListTitle);
+    });
+  }
+
+  void _closeAddItem() {
+    if (!_showAddItemBar) return;
+    _addItemKey.currentState?.dismiss();
+    setState(() => _showAddItemBar = false);
   }
 
   void _handleAddItem(String item, String listTitle) {
@@ -294,29 +304,34 @@ class _ListsScreenState extends State<ListsScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _manager.totalItemCount == 0
-                ? EmptyStateView(
-                    icon: Icons.checklist_rtl_outlined,
-                    title: 'Your list is empty',
-                    message:
-                        'Clip deals from flyers or type an item below to start your shopping list.',
-                    actionLabel: 'Add first item',
-                    onAction: () => _openAddItem(),
-                  )
-                : ListView(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    children: [
-                      for (final section in _manager.sections)
-                        ..._buildSection(section),
-                    ],
-                  ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _closeAddItem,
+              child: _manager.totalItemCount == 0
+                  ? EmptyStateView(
+                      icon: Icons.checklist_rtl_outlined,
+                      title: 'Your list is empty',
+                      message:
+                          'Clip deals from flyers or tap Add Item to start your shopping list.',
+                      actionLabel: 'Add first item',
+                      onAction: () => _openAddItem(),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      children: [
+                        for (final section in _manager.sections)
+                          ..._buildSection(section),
+                      ],
+                    ),
+            ),
           ),
-          AddItemInput(
-            key: _addItemKey,
-            embedded: true,
-            lists: _manager.sections.map((s) => s.title).toList(),
-            onSubmit: _handleAddItem,
-          ),
+          if (_showAddItemBar)
+            AddItemInput(
+              key: _addItemKey,
+              embedded: true,
+              lists: _manager.sections.map((s) => s.title).toList(),
+              onSubmit: _handleAddItem,
+            ),
         ],
       ),
     );
