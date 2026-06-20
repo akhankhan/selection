@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/empty_state_view.dart';
+import '../../../core/widgets/error_state_view.dart';
 import '../../flyer/data/flyer_repository.dart';
 import '../../flyer/models/store.dart';
 
@@ -45,8 +47,6 @@ class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final appTheme = context.appTheme;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -63,11 +63,8 @@ class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
         stream: FlyerRepository.instance.watchStores(),
         builder: (context, snap) {
           if (snap.hasError) {
-            return Center(
-              child: Text(
-                'Could not load stores.',
-                style: TextStyle(color: appTheme.subtitle),
-              ),
+            return const ErrorStateView(
+              message: 'We could not load your favorite stores right now.',
             );
           }
           if (!snap.hasData) {
@@ -83,35 +80,11 @@ class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
               .toList();
 
           if (favorites.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.favorite_border,
-                      size: 56,
-                      color: appTheme.subtitle,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No favorite stores yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: appTheme.navyText,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap the heart on any store in Browse to add it here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: appTheme.subtitle, height: 1.4),
-                    ),
-                  ],
-                ),
-              ),
+            return EmptyStateView(
+              icon: Icons.favorite_border,
+              title: 'No favorite stores yet',
+              message:
+                  'Tap the heart on any store in Browse to add it here.',
             );
           }
 

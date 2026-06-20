@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/empty_state_view.dart';
 import '../models/list_item.dart';
 import '../models/shopping_list_manager.dart';
 import '../widgets/add_item_input.dart';
@@ -201,13 +202,22 @@ class _ListsScreenState extends State<ListsScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 8),
-              children: [
-                for (final section in _manager.sections)
-                  ..._buildSection(section),
-              ],
-            ),
+            child: _manager.totalItemCount == 0
+                ? EmptyStateView(
+                    icon: Icons.checklist_rtl_outlined,
+                    title: 'Your list is empty',
+                    message:
+                        'Clip deals from flyers or type an item below to start your shopping list.',
+                    actionLabel: 'Add first item',
+                    onAction: () => _openAddItem(),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    children: [
+                      for (final section in _manager.sections)
+                        ..._buildSection(section),
+                    ],
+                  ),
           ),
           AddItemInput(
             key: _addItemKey,

@@ -115,11 +115,12 @@ class DeleteOptionsSheet extends StatelessWidget {
     bool destructive = false,
   }) {
     final theme = context.appTheme;
+    final destructiveColor = Theme.of(context).colorScheme.error;
     final enabled = count > 0;
     final color = !enabled
         ? theme.subtitle.withValues(alpha: 0.45)
         : destructive
-        ? const Color(0xFFD23A28)
+        ? destructiveColor
         : theme.navyText;
 
     return InkWell(
@@ -152,7 +153,7 @@ class DeleteOptionsSheet extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: destructive
-                      ? const Color(0xFFD23A28)
+                      ? destructiveColor
                       : context.brandBlue,
                 ),
               ),

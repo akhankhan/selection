@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/empty_state_view.dart';
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
 import '../models/search_results.dart';
@@ -127,35 +128,10 @@ class _SearchTabViewState extends State<SearchTabView> {
     final appTheme = context.appTheme;
 
     if (_recentSearches.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.search, size: 56, color: appTheme.subtitle),
-              const SizedBox(height: 16),
-              Text(
-                'Search for stores or deals',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: appTheme.navyText,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Try a store name like Walmart or a product like milk.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: appTheme.subtitle,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return EmptyStateView(
+        icon: Icons.search,
+        title: 'Search for stores or deals',
+        message: 'Try a store name like Walmart or a product like milk.',
       );
     }
 
@@ -209,38 +185,10 @@ class _SearchTabViewState extends State<SearchTabView> {
   }
 
   Widget _buildEmptyResults(String query) {
-    final appTheme = context.appTheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off_outlined, size: 56, color: appTheme.subtitle),
-            const SizedBox(height: 16),
-            Text(
-              'No results for "$query"',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: appTheme.navyText,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try a different store name or product keyword.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: appTheme.subtitle,
-                height: 1.4,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return EmptyStateView(
+      icon: Icons.search_off_outlined,
+      title: 'No results for "$query"',
+      message: 'Try a different store name or product keyword.',
     );
   }
 

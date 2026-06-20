@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/storage/location_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/empty_state_view.dart';
+import '../../../core/widgets/error_state_view.dart';
 import '../../flyer/data/flyer_repository.dart';
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
@@ -58,6 +60,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
   Object? _filterCacheStoresId;
   String? _filterCacheLocationId;
   List<Store> _allStores = const [];
+  int _storeReloadToken = 0;
+
+  void _retryStoreLoad() {
+    FlyerRepository.instance.clearCache();
+    setState(() => _storeReloadToken++);
+  }
 
   @override
   void initState() {
@@ -460,10 +468,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
         body: SafeArea(
         top: false,
         child: StreamBuilder<List<Store>>(
+          key: ValueKey(_storeReloadToken),
           stream: FlyerRepository.instance.watchStores(),
           builder: (context, snap) {
             if (snap.hasError) {
-              return _buildErrorState('Could not load flyers: ${snap.error}');
+              return ErrorStateView(
+                message:
+                    'We could not load flyers right now. Check your connection and try again.',
+                onRetry: _retryStoreLoad,
+              );
             }
             if (!snap.hasData) {
               return Column(
@@ -886,39 +899,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildEmptyFavorites() {
-    final appTheme = context.appTheme;
-
     return Padding(
       padding: const EdgeInsets.only(top: 103.0),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.favorite_border, size: 64, color: appTheme.subtitle),
-              const SizedBox(height: 16),
-              Text(
-                'No Favorites Yet',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.navyText,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Tap the heart icon on any flyer to save it to your favorites list.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: appTheme.subtitle,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
+      child: EmptyStateView(
+        icon: Icons.favorite_border,
+        title: 'No Favorites Yet',
+        message:
+            'Tap the heart icon on any flyer to save it to your favorites list.',
+        actionLabel: 'Browse stores',
+        onAction: () {
+          _selectCategory(1);
+          _pageController.jumpToPage(1);
+        },
       ),
     );
   }
@@ -1114,62 +1106,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildEmptyCategory(String categoryName) {
-    final appTheme = context.appTheme;
-
     return Padding(
       padding: const EdgeInsets.only(top: 103.0),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.storefront_outlined, size: 64, color: appTheme.subtitle),
-              const SizedBox(height: 16),
-              Text(
-                'No $categoryName flyers found',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: appTheme.navyText,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'We update our flyers daily. Please check back later or try another category.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: appTheme.subtitle,
-                  height: 1.35,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String message) {
-    final appTheme = context.appTheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 56, color: Colors.red.shade300),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: appTheme.subtitle),
-            ),
-          ],
-        ),
+      child: EmptyStateView(
+        icon: Icons.storefront_outlined,
+        title: 'No $categoryName flyers found',
+        message:
+            'We update our flyers daily. Please check back later or try another category.',
       ),
     );
   }

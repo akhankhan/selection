@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'core/services/analytics_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/storage/auto_delete_preferences_store.dart';
@@ -13,15 +16,29 @@ import 'core/storage/favorites_store.dart';
 import 'core/storage/location_store.dart';
 import 'core/storage/loyalty_cards_store.dart';
 import 'core/storage/notification_preferences_store.dart';
-import 'features/browse/screens/browse_screen.dart';
+import 'core/storage/onboarding_store.dart';
 import 'features/lists/models/shopping_list_manager.dart';
+import 'features/onboarding/screens/app_launch_screen.dart';
 import 'features/settings/services/push_notification_service.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
+
+  await AnalyticsService.instance.initialize();
   await ThemeController.instance.load();
+  await OnboardingStore.instance.load();
   await FavoritesStore.instance.load();
   await LocationStore.instance.load();
   await AutoDeletePreferencesStore.instance.load();
@@ -63,8 +80,11 @@ Future<void> _syncUserToFirestore(User? user) async {
     if (NotificationPreferencesStore.instance.enabled) {
       unawaited(PushNotificationService.instance.registerForPush());
     }
-  } catch (e) {
+  } catch (e, stack) {
     debugPrint('[Firestore] user sync failed: $e');
+    unawaited(
+      FirebaseCrashlytics.instance.recordError(e, stack, reason: 'user_sync'),
+    );
   }
 }
 
@@ -84,7 +104,7 @@ class MyApp extends StatelessWidget {
           themeMode: ThemeController.instance.themeMode,
           themeAnimationDuration: const Duration(milliseconds: 250),
           themeAnimationCurve: Curves.easeInOut,
-          home: const BrowseScreen(),
+          home: const AppLaunchScreen(),
         );
       },
     );
