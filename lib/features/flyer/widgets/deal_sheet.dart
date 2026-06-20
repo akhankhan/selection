@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../models/flyer_item.dart';
 import 'product_thumbnail.dart';
@@ -16,6 +17,11 @@ class DealSheet extends StatefulWidget {
   /// Decoded flyer page image the [item] lives on.
   final ui.Image? flyerImage;
 
+  final String storeName;
+  final String storeDateRange;
+  final String storeLogoLetter;
+  final Color storeBrandColor;
+
   /// Open already expanded to the full detail view instead of the peek.
   final bool startExpanded;
 
@@ -23,6 +29,10 @@ class DealSheet extends StatefulWidget {
     super.key,
     required this.item,
     required this.flyerImage,
+    required this.storeName,
+    required this.storeDateRange,
+    required this.storeLogoLetter,
+    required this.storeBrandColor,
     this.startExpanded = false,
   });
 
@@ -51,6 +61,7 @@ class _DealSheetState extends State<DealSheet> {
   final DraggableScrollableController _controller =
       DraggableScrollableController();
   bool _expanded = false;
+  bool _showComingSoonMessage = false;
 
   @override
   void initState() {
@@ -78,6 +89,40 @@ class _DealSheetState extends State<DealSheet> {
       _expanded ? _collapsedSize : _expandedSize,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
+    );
+  }
+
+  void _buyNow() {
+    setState(() => _showComingSoonMessage = true);
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _showComingSoonMessage = false);
+    });
+  }
+
+  Future<void> _shareDeal() async {
+    final trimmedDates = widget.storeDateRange.trim();
+    final buffer = StringBuffer()
+      ..write('${widget.item.name} — ${widget.item.price} at ${widget.storeName}');
+    if (trimmedDates.isNotEmpty) {
+      buffer.write('\nValid $trimmedDates');
+    }
+    buffer.write('\nBrowse deals in Selection.');
+    await SharePlus.instance.share(ShareParams(text: buffer.toString()));
+  }
+
+  void _showPolicyDialog(String title, String body) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: Text(body)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -137,6 +182,13 @@ class _DealSheetState extends State<DealSheet> {
                     ),
                   ],
                 ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                child: _showComingSoonMessage
+                    ? _buildComingSoonBanner()
+                    : const SizedBox.shrink(),
               ),
               _buildButtons(context),
             ],
@@ -280,13 +332,13 @@ class _DealSheetState extends State<DealSheet> {
                     width: 26,
                     height: 26,
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      color: _brandBlue,
+                    decoration: BoxDecoration(
+                      color: widget.storeBrandColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Text(
-                      'W',
-                      style: TextStyle(
+                    child: Text(
+                      widget.storeLogoLetter,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -298,11 +350,11 @@ class _DealSheetState extends State<DealSheet> {
                     child: Text.rich(
                       TextSpan(
                         style: TextStyle(fontSize: 14, color: textColor),
-                        children: const [
-                          TextSpan(text: 'Sold and fulfilled by '),
+                        children: [
+                          const TextSpan(text: 'Sold and fulfilled by '),
                           TextSpan(
-                            text: 'Walmart',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            text: widget.storeName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -311,11 +363,13 @@ class _DealSheetState extends State<DealSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                'Valid from May 21, 2026 to May 28, 2026',
-                style: TextStyle(fontSize: 13, color: subtitleColor),
-              ),
-              const SizedBox(height: 12),
+              if (widget.storeDateRange.trim().isNotEmpty) ...[
+                Text(
+                  'Valid ${widget.storeDateRange.trim()}',
+                  style: TextStyle(fontSize: 13, color: subtitleColor),
+                ),
+                const SizedBox(height: 12),
+              ],
             ],
           ),
         ),
@@ -325,9 +379,23 @@ class _DealSheetState extends State<DealSheet> {
         _bodyText('SKU: $sku'),
         const SizedBox(height: 10),
         _sectionHeader('Terms and conditions'),
-        _linkRow('Shipping policy'),
+        _linkRow(
+          'Shipping policy',
+          onTap: () => _showPolicyDialog(
+            'Shipping policy',
+            'Standard shipping rates apply for online orders from '
+            '${widget.storeName}. Delivery times vary by location.',
+          ),
+        ),
         Divider(height: 1, color: dividerColor, thickness: 1),
-        _linkRow('Return policy'),
+        _linkRow(
+          'Return policy',
+          onTap: () => _showPolicyDialog(
+            'Return policy',
+            'Returns must be made within the store return window. '
+            'Keep your receipt and follow ${widget.storeName} return guidelines.',
+          ),
+        ),
         Divider(height: 1, color: dividerColor, thickness: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -373,9 +441,9 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-  Widget _linkRow(String label) {
+  Widget _linkRow(String label, {required VoidCallback onTap}) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
@@ -386,6 +454,37 @@ class _DealSheetState extends State<DealSheet> {
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComingSoonBanner() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: _brandBlue.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _brandBlue.withValues(alpha: 0.35)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, color: _brandBlue, size: 20),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'This feature is coming soon.',
+                style: TextStyle(
+                  color: _brandBlue,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -412,7 +511,7 @@ class _DealSheetState extends State<DealSheet> {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: _buyNow,
               icon: const Icon(Icons.storefront_outlined, size: 20),
               label: const Text(
                 'Buy Now',
@@ -431,7 +530,7 @@ class _DealSheetState extends State<DealSheet> {
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: _shareDeal,
               icon: const Icon(Icons.share, color: Colors.white, size: 20),
               label: const Text(
                 'Share deal',

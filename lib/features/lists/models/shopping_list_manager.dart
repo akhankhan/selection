@@ -1,24 +1,32 @@
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/widgets/product_thumbnail.dart';
+import '../models/list_item.dart';
+import '../models/persisted_list_data.dart';
+import '../services/shopping_list_storage.dart';
 import '../utils/flyer_date_parser.dart';
+import '../widgets/flyer_list_thumbnail.dart';
 import '../widgets/mock_thumbnails.dart';
-import 'list_item.dart';
 
 class ShoppingListManager extends ChangeNotifier {
-  static final ShoppingListManager _instance = ShoppingListManager._internal();
-  factory ShoppingListManager() => _instance;
+  ShoppingListManager._();
 
-  ShoppingListManager._internal() {
-    _sections = [ListSection(title: 'My List', items: [])];
-  }
+  static final ShoppingListManager instance = ShoppingListManager._();
+  factory ShoppingListManager() => instance;
 
-  late final List<ListSection> _sections;
+  static const _myListTitle = 'My List';
+
+  List<ListSection> _sections = [ListSection(title: _myListTitle, items: [])];
+  bool _loaded = false;
+
   List<ListSection> get sections => _sections;
+  bool get isLoaded => _loaded;
 
   int get totalItemCount {
-    int count = 0;
+    var count = 0;
     for (final section in _sections) {
       count += section.items.length;
     }
@@ -26,7 +34,7 @@ class ShoppingListManager extends ChangeNotifier {
   }
 
   int get checkedCount {
-    int count = 0;
+    var count = 0;
     for (final section in _sections) {
       count += section.items.where((item) => item.checked).length;
     }
@@ -34,40 +42,63 @@ class ShoppingListManager extends ChangeNotifier {
   }
 
   int get expiredCount {
-    int count = 0;
+    var count = 0;
     for (final section in _sections) {
       count += section.items.where((item) => isFlyerExpired(item.expiresAt)).length;
     }
     return count;
   }
 
-  // Checks if a flyer item exists in the list
+  Future<void> load() async {
+    final saved = await ShoppingListStorage.load();
+    if (saved == null || saved.items.isEmpty) {
+      _sections = [ListSection(title: _myListTitle, items: [])];
+      _loaded = true;
+      notifyListeners();
+      return;
+    }
+
+    final sectionMap = <String, List<ListItem>>{};
+    for (final persisted in saved.items) {
+      sectionMap.putIfAbsent(persisted.sectionTitle, () => []);
+      sectionMap[persisted.sectionTitle]!.add(_itemFromPersisted(persisted));
+    }
+
+    _sections = sectionMap.entries
+        .map((entry) => ListSection(title: entry.key, items: entry.value))
+        .toList();
+
+    if (_findSection(_myListTitle) == null) {
+      _sections.insert(0, ListSection(title: _myListTitle, items: []));
+    }
+
+    _loaded = true;
+    notifyListeners();
+  }
+
   bool hasFlyerItem(String flyerItemId, String storeName) {
     final section = _findSection(storeName);
     if (section == null) return false;
     return section.items.any((item) => item.flyerItemId == flyerItemId);
   }
 
-  // Adds an item selected from the flyer
   void addFlyerItem(
     FlyerItem item,
     String storeName,
     ui.Image? flyerImage, {
     String? storeDateRange,
+    String? pageImageUrl,
   }) {
-    // 1. Find or create the section
     var section = _findSection(storeName);
     if (section == null) {
       section = ListSection(title: storeName, items: []);
       _sections.add(section);
     }
 
-    // 2. Prevent duplicate additions
     if (section.items.any((li) => li.flyerItemId == item.id)) {
       return;
     }
 
-    // 3. Compute crop rectangle for the flyer item (matches DealSheet)
     final Rect b = item.boundingBox;
     final Rect photoCrop = Rect.fromLTRB(
       b.left + b.width * 0.03,
@@ -76,7 +107,6 @@ class ShoppingListManager extends ChangeNotifier {
       b.bottom - b.height * 0.07,
     );
 
-    // 4. Safely calculate the price savings if oldPrice exists
     String? saveText;
     if (item.oldPrice != null) {
       try {
@@ -95,31 +125,29 @@ class ShoppingListManager extends ChangeNotifier {
       }
     }
 
-    // 5. Create new ListItem
-    final listItem = ListItem(
-      name: item.name,
-      thumbnail: SizedBox(
-        width: 64,
-        height: 56,
-        child: ProductThumbnail(
+    section.items.add(
+      ListItem(
+        name: item.name,
+        thumbnail: _buildThumbnail(
           flyerImage: flyerImage,
+          pageImageUrl: pageImageUrl,
           cropRect: photoCrop,
-          borderRadius: BorderRadius.circular(2),
+          manual: false,
         ),
+        saveText: saveText,
+        salePrefix: item.isRollback ? 'SALE' : null,
+        priceText: item.price,
+        subtitle: item.isRollback ? 'Rollback' : 'Special Deal',
+        flyerItemId: item.id,
+        expiresAt: parseFlyerExpiryDate(storeDateRange ?? ''),
+        flyerPageImageUrl: pageImageUrl,
+        flyerCropRect: photoCrop,
       ),
-      saveText: saveText,
-      salePrefix: item.isRollback ? 'SALE' : null,
-      priceText: item.price,
-      subtitle: item.isRollback ? 'Rollback' : 'Special Deal',
-      flyerItemId: item.id,
-      expiresAt: parseFlyerExpiryDate(storeDateRange ?? ''),
     );
 
-    section.items.add(listItem);
-    notifyListeners();
+    _notifyAndPersist();
   }
 
-  // Removes an item selected from the flyer
   void removeFlyerItem(String flyerItemId, String storeName) {
     final section = _findSection(storeName);
     if (section == null) return;
@@ -128,14 +156,13 @@ class ShoppingListManager extends ChangeNotifier {
     section.items.removeWhere((item) => item.flyerItemId == flyerItemId);
 
     if (section.items.length != initialLength) {
-      if (section.items.isEmpty && storeName != 'My List') {
+      if (section.items.isEmpty && storeName != _myListTitle) {
         _sections.remove(section);
       }
-      notifyListeners();
+      _notifyAndPersist();
     }
   }
 
-  // Adds a custom item to a section
   void addItem(String name, String storeName) {
     var section = _findSection(storeName);
     if (section == null) {
@@ -143,59 +170,168 @@ class ShoppingListManager extends ChangeNotifier {
       _sections.add(section);
     }
 
-    final listItem = ListItem(name: name, thumbnail: const GenericThumbnail());
+    section.items.add(
+      ListItem(
+        name: name,
+        thumbnail: _buildThumbnail(manual: true),
+      ),
+    );
 
-    section.items.add(listItem);
-    notifyListeners();
+    _notifyAndPersist();
   }
 
-  // Toggles checked status of an item
   void setChecked(ListItem item, bool checked) {
     item.checked = checked;
-    notifyListeners();
+    _notifyAndPersist();
   }
 
-  // Changes quantity of an item
   void setQty(ListItem item, int qty) {
     item.qty = qty;
-    notifyListeners();
+    _notifyAndPersist();
   }
 
   int deleteChecked() {
-    int removed = 0;
+    var removed = 0;
     for (final section in _sections) {
       final before = section.items.length;
       section.items.removeWhere((item) => item.checked);
       removed += before - section.items.length;
     }
-    _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
-
-    notifyListeners();
+    _sections.removeWhere((s) => s.items.isEmpty && s.title != _myListTitle);
+    _notifyAndPersist();
     return removed;
   }
 
   int deleteExpired() {
-    int removed = 0;
+    var removed = 0;
     for (final section in _sections) {
       final before = section.items.length;
       section.items.removeWhere((item) => isFlyerExpired(item.expiresAt));
       removed += before - section.items.length;
     }
-    _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
-
-    notifyListeners();
+    _sections.removeWhere((s) => s.items.isEmpty && s.title != _myListTitle);
+    _notifyAndPersist();
     return removed;
   }
 
   int deleteAll() {
-    int removed = totalItemCount;
+    final removed = totalItemCount;
     for (final section in _sections) {
       section.items.clear();
     }
-    _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
-
-    notifyListeners();
+    _sections.removeWhere((s) => s.items.isEmpty && s.title != _myListTitle);
+    _notifyAndPersist();
     return removed;
+  }
+
+  Future<void> clearHistory() => ShoppingListStorage.clear();
+
+  ListItem _itemFromPersisted(PersistedListItem persisted) {
+    Rect? cropRect;
+    if (persisted.cropLeft != null &&
+        persisted.cropTop != null &&
+        persisted.cropRight != null &&
+        persisted.cropBottom != null) {
+      cropRect = Rect.fromLTRB(
+        persisted.cropLeft!,
+        persisted.cropTop!,
+        persisted.cropRight!,
+        persisted.cropBottom!,
+      );
+    }
+
+    return ListItem(
+      name: persisted.name,
+      thumbnail: _buildThumbnail(
+        pageImageUrl: persisted.pageImageUrl,
+        cropRect: cropRect,
+        manual: !persisted.isFlyerItem,
+      ),
+      saveText: persisted.saveText,
+      salePrefix: persisted.salePrefix,
+      priceText: persisted.priceText,
+      subtitle: persisted.subtitle,
+      qty: persisted.qty,
+      checked: persisted.checked,
+      flyerItemId: persisted.flyerItemId,
+      expiresAt: persisted.expiresAtIso == null
+          ? null
+          : DateTime.tryParse(persisted.expiresAtIso!),
+      flyerPageImageUrl: persisted.pageImageUrl,
+      flyerCropRect: cropRect,
+    );
+  }
+
+  Widget _buildThumbnail({
+    ui.Image? flyerImage,
+    String? pageImageUrl,
+    Rect? cropRect,
+    required bool manual,
+  }) {
+    const size = Size(64, 56);
+
+    if (manual) {
+      return const SizedBox(width: 64, height: 56, child: GenericThumbnail());
+    }
+
+    if (flyerImage != null && cropRect != null) {
+      return SizedBox(
+        width: size.width,
+        height: size.height,
+        child: ProductThumbnail(
+          flyerImage: flyerImage,
+          cropRect: cropRect,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      );
+    }
+
+    if (pageImageUrl != null && cropRect != null) {
+      return SizedBox(
+        width: size.width,
+        height: size.height,
+        child: FlyerListThumbnail(
+          imageUrl: pageImageUrl,
+          cropRect: cropRect,
+        ),
+      );
+    }
+
+    return const SizedBox(width: 64, height: 56, child: GenericThumbnail());
+  }
+
+  Future<void> _persist() async {
+    final items = <PersistedListItem>[];
+    for (final section in _sections) {
+      for (final item in section.items) {
+        items.add(
+          PersistedListItem(
+            name: item.name,
+            sectionTitle: section.title,
+            qty: item.qty,
+            checked: item.checked,
+            saveText: item.saveText,
+            salePrefix: item.salePrefix,
+            priceText: item.priceText,
+            subtitle: item.subtitle,
+            flyerItemId: item.flyerItemId,
+            expiresAtIso: item.expiresAt?.toIso8601String(),
+            pageImageUrl: item.flyerPageImageUrl,
+            cropLeft: item.flyerCropRect?.left,
+            cropTop: item.flyerCropRect?.top,
+            cropRight: item.flyerCropRect?.right,
+            cropBottom: item.flyerCropRect?.bottom,
+          ),
+        );
+      }
+    }
+
+    await ShoppingListStorage.save(PersistedShoppingList(items: items));
+  }
+
+  void _notifyAndPersist() {
+    notifyListeners();
+    _persist();
   }
 
   ListSection? _findSection(String title) {

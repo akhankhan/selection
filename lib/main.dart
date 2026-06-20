@@ -6,13 +6,19 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/storage/favorites_store.dart';
+import 'core/storage/location_store.dart';
 import 'features/browse/screens/browse_screen.dart';
+import 'features/lists/models/shopping_list_manager.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await ThemeController.instance.load();
+  await FavoritesStore.instance.load();
+  await LocationStore.instance.load();
+  await ShoppingListManager.instance.load();
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: true,
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,

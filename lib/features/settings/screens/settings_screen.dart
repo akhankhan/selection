@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../browse/services/search_history_service.dart';
+import '../../lists/models/shopping_list_manager.dart';
 import 'signin_screen.dart';
 import 'edit_profile_screen.dart';
 import 'privacy_choices_screen.dart';
@@ -445,6 +446,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _confirmClear(
               'Shopping List History',
               'Are you sure you want to clear your shopping list history? This action is irreversible.',
+              onConfirm: () async {
+                ShoppingListManager.instance.deleteAll();
+                await ShoppingListManager.instance.clearHistory();
+              },
             ),
           ),
           _buildDivider(),

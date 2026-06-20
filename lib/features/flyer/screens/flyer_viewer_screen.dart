@@ -1,11 +1,13 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 import '../data/cloudinary_url.dart';
 import '../models/flyer_item.dart';
 import '../models/store.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
+import '../../../core/storage/favorites_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
@@ -18,10 +20,15 @@ const int _kFlyerPageWidth = 1100;
 class FlyerViewerScreen extends StatefulWidget {
   final List<Store> stores;
   final int initialStoreIndex;
+  final FlyerItem? initialFlyerItem;
+  final int? initialFlyerPageIndex;
+
   const FlyerViewerScreen({
     super.key,
     required this.stores,
     this.initialStoreIndex = 0,
+    this.initialFlyerItem,
+    this.initialFlyerPageIndex,
   });
 
   @override
@@ -77,9 +84,19 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     );
     _warmImagesAround(_currentStore);
 
-    // Add shopping list listener
+    FavoritesStore.instance.addListener(_onFavoritesChanged);
     ShoppingListManager().addListener(_onShoppingListChanged);
     _syncHighlights();
+
+    if (widget.initialFlyerItem != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openInitialDealTarget();
+      });
+    }
+  }
+
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Decode flyer pages for the current store and its immediate neighbours,
@@ -199,6 +216,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
 
   @override
   void dispose() {
+    FavoritesStore.instance.removeListener(_onFavoritesChanged);
     ShoppingListManager().removeListener(_onShoppingListChanged);
     _storeController.dispose();
     for (final c in _scrollControllers) {
@@ -209,6 +227,122 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     }
     _flyerImages.dispose();
     super.dispose();
+  }
+
+  List<Store> _relatedStoresFor(int storeIdx) {
+    return [
+      for (int i = 0; i < _stores.length; i++)
+        if (i != storeIdx) _stores[i],
+    ];
+  }
+
+  Future<void> _openInitialDealTarget() async {
+    final item = widget.initialFlyerItem;
+    if (item == null || !mounted) return;
+    final pageIdx = widget.initialFlyerPageIndex ?? item.pageIndex;
+    await _scrollToPageAndShowDeal(item, pageIdx);
+  }
+
+  Future<void> _scrollToPageAndShowDeal(FlyerItem item, int pageIdx) async {
+    final store = _activeStore;
+    if (pageIdx < 0 || pageIdx >= store.pages.length) return;
+
+    _setTab(_Tab.weeklyAd);
+
+    final width = MediaQuery.of(context).size.width;
+    final pageHeights =
+        store.pages.map((p) => width / p.aspectRatio).toList();
+    double offset = _tabBarHeight + _tabBarBottomSpace;
+    for (int i = 0; i < pageIdx; i++) {
+      offset += pageHeights[i];
+    }
+
+    final ctrl = _scrollControllers[_currentStore];
+    for (int attempt = 0; attempt < 12; attempt++) {
+      if (ctrl.hasClients) break;
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    if (ctrl.hasClients) {
+      await ctrl.animateTo(
+        offset,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (!mounted) return;
+    setState(() => _currentPage = pageIdx);
+
+    final page = store.pages[pageIdx];
+    final renderUrl = _renderUrlForPage(page);
+    await _ensureImageLoaded(renderUrl);
+
+    if (mounted) {
+      _showItemBottomSheet(item, renderUrl, store: store);
+    }
+  }
+
+  Future<void> _ensureImageLoaded(String renderUrl) async {
+    if (_flyerImages.value.containsKey(renderUrl)) return;
+    _loadStoreImages(_activeStore);
+    for (int attempt = 0; attempt < 30; attempt++) {
+      if (_flyerImages.value.containsKey(renderUrl)) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> _shareStore() async {
+    final store = _activeStore;
+    final trimmedDates = store.dateRange.trim();
+    final buffer = StringBuffer()..write('${store.name} weekly ad');
+    if (trimmedDates.isNotEmpty) {
+      buffer.write(' ($trimmedDates)');
+    }
+    buffer.write('\nBrowse deals in Selection.');
+    await SharePlus.instance.share(ShareParams(text: buffer.toString()));
+  }
+
+  void _toggleFavorite() {
+    FavoritesStore.instance.toggle(_activeStore.id);
+  }
+
+  void _showStoreInfo() {
+    final store = _activeStore;
+    final appTheme = context.appTheme;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(store.name),
+        content: Text(
+          'Weekly ad valid ${store.dateRange}.\n\n'
+          '${store.pages.length} page${store.pages.length == 1 ? '' : 's'} available.',
+          style: TextStyle(color: appTheme.navyText, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openRelatedStore(int storeIdx) {
+    if (storeIdx == _currentStore) {
+      _setTab(_Tab.weeklyAd);
+      return;
+    }
+    if (_storeController.hasClients) {
+      _storeController.animateToPage(
+        storeIdx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      setState(() => _currentStore = storeIdx);
+    }
+    _setTab(_Tab.weeklyAd);
   }
 
   void _handleTap(
@@ -258,6 +392,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         store.name,
         _flyerImages.value[renderUrl],
         storeDateRange: store.dateRange,
+        pageImageUrl: page.imageUrl,
       );
 
       _showItemBottomSheet(tapped, renderUrl);
@@ -269,6 +404,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         store.name,
         _flyerImages.value[renderUrl],
         storeDateRange: store.dateRange,
+        pageImageUrl: page.imageUrl,
       );
       _showItemBottomSheet(tapped, renderUrl);
     } else {
@@ -336,6 +472,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         final List<double> pageHeights = showWeekly
             ? store.pages.map((p) => width / p.aspectRatio).toList()
             : const <double>[];
+        final relatedStores = _relatedStoresFor(storeIdx);
         return NotificationListener<ScrollNotification>(
           onNotification: (notification) {
             if (showWeekly &&
@@ -351,7 +488,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             physics: const BouncingScrollPhysics(),
             itemCount: showWeekly
                 ? (store.pages.isEmpty ? 2 : store.pages.length + 1)
-                : 2,
+                : (relatedStores.isEmpty ? 2 : relatedStores.length + 1),
             itemBuilder: (context, index) {
               if (index == 0) {
                 return Column(
@@ -373,8 +510,18 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
                 final pageIdx = index - 1;
                 return _buildFlyerImage(storeIdx, pageIdx, width, pageHeights[pageIdx]);
               } else {
-                return _buildEmptyState(
-                  viewportHeight - _tabBarHeight - _tabBarBottomSpace,
+                if (relatedStores.isEmpty) {
+                  return _buildEmptyState(
+                    viewportHeight - _tabBarHeight - _tabBarBottomSpace,
+                    message: 'No related ads from other stores',
+                  );
+                }
+                final relatedStore = relatedStores[index - 1];
+                final targetIdx =
+                    _stores.indexWhere((s) => s.id == relatedStore.id);
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: _buildRelatedAdTile(relatedStore, targetIdx),
                 );
               }
             },
@@ -417,23 +564,113 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     double height, {
     String message = 'No related ads yet',
   }) {
+    final appTheme = context.appTheme;
     return SizedBox(
       height: height > 200 ? height : 320,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
+            Icon(Icons.inbox_outlined, size: 64, color: appTheme.subtitle),
             const SizedBox(height: 12),
             Text(
               message,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey[600],
+                color: appTheme.subtitle,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRelatedAdTile(Store store, int storeIdx) {
+    final appTheme = context.appTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final thumbUrl = store.pages.isNotEmpty
+        ? CloudinaryUrl.sized(store.pages.first.imageUrl, width: 400)
+        : null;
+
+    return Material(
+      color: appTheme.cardSurface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => _openRelatedStore(storeIdx),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: store.brandColor,
+                radius: 22,
+                child: Text(
+                  store.logoLetter,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      store.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: appTheme.navyText,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      store.dateRange,
+                      style: TextStyle(fontSize: 13, color: appTheme.subtitle),
+                    ),
+                    if (store.pages.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${store.pages.length} page${store.pages.length == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (thumbUrl != null && thumbUrl.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    width: 52,
+                    height: 68,
+                    fit: BoxFit.cover,
+                    imageUrl: thumbUrl,
+                    placeholder: (_, _) => Container(
+                      width: 52,
+                      height: 68,
+                      color: appTheme.sectionBg,
+                    ),
+                    errorWidget: (_, _, _) => Container(
+                      width: 52,
+                      height: 68,
+                      color: appTheme.sectionBg,
+                      child: Icon(Icons.image_outlined, color: appTheme.subtitle),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -502,7 +739,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           children: [
             Positioned.fill(
               child: page.imageUrl.isEmpty
-                  ? const ColoredBox(color: Color(0xFFF2F3F5))
+                  ? ColoredBox(color: context.appTheme.sectionBg)
                   : RepaintBoundary(
                       child: CachedNetworkImage(
                         imageUrl: renderUrl,
@@ -584,7 +821,12 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     );
   }
 
-  void _showItemBottomSheet(FlyerItem item, String renderUrl) {
+  void _showItemBottomSheet(
+    FlyerItem item,
+    String renderUrl, {
+    Store? store,
+  }) {
+    final activeStore = store ?? _activeStore;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -597,8 +839,14 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       barrierColor: Colors.transparent,
       builder: (ctx) => ValueListenableBuilder<Map<String, ui.Image>>(
         valueListenable: _flyerImages,
-        builder: (_, images, _) =>
-            DealSheet(item: item, flyerImage: images[renderUrl]),
+        builder: (_, images, _) => DealSheet(
+          item: item,
+          flyerImage: images[renderUrl],
+          storeName: activeStore.name,
+          storeDateRange: activeStore.dateRange,
+          storeLogoLetter: activeStore.logoLetter,
+          storeBrandColor: activeStore.brandColor,
+        ),
       ),
     );
   }
@@ -611,6 +859,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final colorScheme = Theme.of(context).colorScheme;
     final appBarTheme = Theme.of(context).appBarTheme;
     final iconColor = appBarTheme.foregroundColor ?? colorScheme.onSurface;
+
+    final bool isFavorite = FavoritesStore.instance.contains(store.id);
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -627,7 +877,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         actions: [
           IconButton(
             icon: Icon(Icons.share_outlined, color: iconColor.withValues(alpha: 0.7)),
-            onPressed: null,
+            onPressed: _shareStore,
           ),
           if (listCount > 0)
             Badge(
@@ -659,12 +909,38 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
               },
             ),
           IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.red),
-            onPressed: null,
+            icon: Icon(
+              isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: Colors.red,
+            ),
+            onPressed: _toggleFavorite,
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: Icon(Icons.more_vert, color: iconColor.withValues(alpha: 0.7)),
-            onPressed: null,
+            onSelected: (value) {
+              switch (value) {
+                case 'share':
+                  _shareStore();
+                case 'favorite':
+                  _toggleFavorite();
+                case 'info':
+                  _showStoreInfo();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'share',
+                child: Text('Share flyer'),
+              ),
+              PopupMenuItem(
+                value: 'favorite',
+                child: Text(isFavorite ? 'Remove favorite' : 'Add to favorites'),
+              ),
+              const PopupMenuItem(
+                value: 'info',
+                child: Text('Store info'),
+              ),
+            ],
           ),
         ],
         bottom: PreferredSize(

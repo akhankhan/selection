@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/storage/favorites_store.dart';
+import '../../../core/storage/location_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../flyer/data/flyer_repository.dart';
 import '../../flyer/models/flyer_item.dart';
@@ -41,8 +43,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   final ValueNotifier<int> _selectedCategory = ValueNotifier<int>(1);
   int _bottomNavIndex = 0;
-  String _currentLocation = 'A1A 1A1';
-  final Set<String> _favoritedStoreIds = {};
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -55,6 +55,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   /// invalidates the cache.
   final Map<int, List<Store>> _filterCache = {};
   Object? _filterCacheStoresId;
+  String? _filterCacheLocationId;
+  List<Store> _allStores = const [];
 
   @override
   void initState() {
@@ -62,6 +64,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
     _pageController = PageController(initialPage: _selectedCategory.value);
     _pageController.addListener(_onPageScroll);
     _searchController.addListener(_onSearchTextChanged);
+    FavoritesStore.instance.addListener(_onBrowseDataChanged);
+    LocationStore.instance.addListener(_onBrowseDataChanged);
+  }
+
+  void _onBrowseDataChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onSearchTextChanged() {
@@ -72,6 +80,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   void dispose() {
     _pageController.removeListener(_onPageScroll);
     _searchController.removeListener(_onSearchTextChanged);
+    FavoritesStore.instance.removeListener(_onBrowseDataChanged);
+    LocationStore.instance.removeListener(_onBrowseDataChanged);
     _pageController.dispose();
     _tabsScrollController.dispose();
     _selectedCategory.dispose();
@@ -96,6 +106,29 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (roundedIndex != _selectedCategory.value) {
       _selectedCategory.value = roundedIndex;
       _scrollToCategoryTab(roundedIndex);
+    }
+  }
+
+  void _selectCategory(int index) {
+    if (_selectedCategory.value != index) {
+      _selectedCategory.value = index;
+    }
+    _scrollToCategoryTab(index);
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _syncPageControllerToCategory() {
+    if (!mounted || !_pageController.hasClients) return;
+    final target = _selectedCategory.value;
+    final current = _pageController.page?.round() ?? target;
+    if (current != target) {
+      _pageController.jumpToPage(target);
     }
   }
 
@@ -125,9 +158,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   List<Store> _filterStoresByCategory(List<Store> stores, int index) {
-    if (!identical(stores, _filterCacheStoresId)) {
+    final locationKey = LocationStore.instance.postal;
+    if (!identical(stores, _filterCacheStoresId) ||
+        locationKey != _filterCacheLocationId) {
       _filterCache.clear();
       _filterCacheStoresId = stores;
+      _filterCacheLocationId = locationKey;
     }
     // Favorites is the one case the cache must skip — toggling a heart
     // doesn't change the stores list identity, but the filtered subset
@@ -143,7 +179,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   List<Store> _computeFilteredStores(List<Store> stores, int index) {
     if (index == 0) {
-      return stores.where((s) => _favoritedStoreIds.contains(s.id)).toList();
+      return stores
+          .where((s) => FavoritesStore.instance.contains(s.id))
+          .toList();
     }
     if (index == 1) {
       return stores; // Explore: all stores
@@ -270,13 +308,23 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   void _openDealFromSearch(List<Store> stores, Store store, FlyerItem item) {
-    final storeIndex = stores.indexWhere((s) => s.id == store.id);
+    final allForViewer = LocationStore.instance.filterStores(_allStores);
+    final storeIndex = allForViewer.indexWhere((s) => s.id == store.id);
     if (storeIndex < 0) return;
-    _openStore(stores, storeIndex);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FlyerViewerScreen(
+          stores: allForViewer,
+          initialStoreIndex: storeIndex,
+          initialFlyerItem: item,
+          initialFlyerPageIndex: item.pageIndex,
+        ),
+      ),
+    );
   }
 
   void _showChangeLocationDialog() {
-    final controller = TextEditingController(text: _currentLocation);
+    final controller = TextEditingController(text: LocationStore.instance.postal);
     final appTheme = context.appTheme;
 
     showModalBottomSheet(
@@ -344,22 +392,30 @@ class _BrowseScreenState extends State<BrowseScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     final newLoc = controller.text.trim();
-                    if (newLoc.isNotEmpty) {
-                      setState(() {
-                        _currentLocation = newLoc.toUpperCase();
-                      });
-                      Navigator.pop(sheetContext);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Location updated to $_currentLocation!',
-                          ),
-                          backgroundColor: context.brandBlue,
-                        ),
-                      );
-                    }
+                    if (newLoc.isEmpty) return;
+
+                    final messenger = ScaffoldMessenger.of(context);
+                    final snackColor = context.brandBlue;
+
+                    await LocationStore.instance.setPostal(newLoc);
+                    if (!sheetContext.mounted) return;
+                    Navigator.pop(sheetContext);
+
+                    final hidden =
+                        LocationStore.instance.hiddenCount(_allStores);
+                    final postal = LocationStore.instance.postal;
+                    final message = hidden > 0
+                        ? 'Location set to $postal. $hidden store${hidden == 1 ? '' : 's'} not in this area.'
+                        : 'Location updated to $postal.';
+
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(message),
+                        backgroundColor: snackColor,
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: context.brandBlue,
@@ -432,7 +488,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 ],
               );
             }
-            final stores = snap.data!;
+            _allStores = snap.data!;
+            final stores = LocationStore.instance.filterStores(_allStores);
             if (_bottomNavIndex == 1) {
               return SearchTabView(
                 stores: stores,
@@ -446,13 +503,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
               children: [
                 // 1. Scrollable PageView content (rendered underneath)
                 Positioned.fill(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _categories.length,
-                    onPageChanged: (index) {
-                      _selectedCategory.value = index;
-                    },
-                    itemBuilder: (context, index) {
+                  child: Builder(
+                    builder: (context) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _syncPageControllerToCategory();
+                      });
+                      return PageView.builder(
+                        controller: _pageController,
+                        itemCount: _categories.length,
+                        onPageChanged: (index) {
+                          _selectedCategory.value = index;
+                        },
+                        itemBuilder: (context, index) {
                       if (index == 0) {
                         // Favorites heart tab
                         final favStores = _filterStoresByCategory(stores, 0);
@@ -475,6 +537,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         }
                         return _buildStoreGrid(filtered, title, index);
                       }
+                    },
+                      );
                     },
                   ),
                 ),
@@ -570,7 +634,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     style: TextStyle(fontSize: 12, color: appTheme.subtitle),
                   ),
                   Text(
-                    _currentLocation,
+                    LocationStore.instance.postal,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -712,13 +776,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         children: [
           // 1. Pinned Favorites Tab
           InkWell(
-            onTap: () {
-              _pageController.animateToPage(
-                0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-              );
-            },
+            onTap: () => _selectCategory(0),
             child: Container(
               width: 56,
               height: double.infinity,
@@ -775,13 +833,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               itemBuilder: (context, index) {
                 final int categoryIndex = index + 1;
                 return InkWell(
-                  onTap: () {
-                    _pageController.animateToPage(
-                      categoryIndex,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                    );
-                  },
+                  onTap: () => _selectCategory(categoryIndex),
                   child: ValueListenableBuilder<int>(
                     valueListenable: _selectedCategory,
                     builder: (context, activeIndex, _) {
@@ -910,15 +962,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       index: i,
                       child: StoreCard(
                         store: upcoming[i],
-                        isFavorited: _favoritedStoreIds.contains(upcoming[i].id),
+                        isFavorited: FavoritesStore.instance.contains(upcoming[i].id),
                         onFavoriteToggle: () {
-                          setState(() {
-                            if (_favoritedStoreIds.contains(upcoming[i].id)) {
-                              _favoritedStoreIds.remove(upcoming[i].id);
-                            } else {
-                              _favoritedStoreIds.add(upcoming[i].id);
-                            }
-                          });
+                          FavoritesStore.instance.toggle(upcoming[i].id);
                         },
                         onTap: () => _openStore(upcoming, i),
                       ),
@@ -950,15 +996,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       index: i,
                       child: StoreCard(
                         store: newThisWeek[i],
-                        isFavorited: _favoritedStoreIds.contains(newThisWeek[i].id),
+                        isFavorited: FavoritesStore.instance.contains(newThisWeek[i].id),
                         onFavoriteToggle: () {
-                          setState(() {
-                            if (_favoritedStoreIds.contains(newThisWeek[i].id)) {
-                              _favoritedStoreIds.remove(newThisWeek[i].id);
-                            } else {
-                              _favoritedStoreIds.add(newThisWeek[i].id);
-                            }
-                          });
+                          FavoritesStore.instance.toggle(newThisWeek[i].id);
                         },
                         onTap: () => _openStore(newThisWeek, i),
                       ),
@@ -1000,15 +1040,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     index: i,
                     child: StoreCard(
                       store: stores[i],
-                      isFavorited: _favoritedStoreIds.contains(stores[i].id),
+                      isFavorited: FavoritesStore.instance.contains(stores[i].id),
                       onFavoriteToggle: () {
-                        setState(() {
-                          if (_favoritedStoreIds.contains(stores[i].id)) {
-                            _favoritedStoreIds.remove(stores[i].id);
-                          } else {
-                            _favoritedStoreIds.add(stores[i].id);
-                          }
-                        });
+                        FavoritesStore.instance.toggle(stores[i].id);
                       },
                       onTap: () => _openStore(stores, i),
                     ),
@@ -1159,7 +1193,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
             ).push(MaterialPageRoute(builder: (_) => const ListsScreen()));
           } else {
             setState(() => _bottomNavIndex = i);
-            if (i == 1) {
+            if (i == 0) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _syncPageControllerToCategory();
+              });
+            } else if (i == 1) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) _searchFocusNode.requestFocus();
               });

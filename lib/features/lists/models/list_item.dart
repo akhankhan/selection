@@ -13,6 +13,8 @@ class ListItem {
     this.checked = false,
     this.flyerItemId,
     this.expiresAt,
+    this.flyerPageImageUrl,
+    this.flyerCropRect,
   });
 
   final String name;
@@ -26,6 +28,8 @@ class ListItem {
   bool checked;
   final String? flyerItemId;
   final DateTime? expiresAt;
+  final String? flyerPageImageUrl;
+  final Rect? flyerCropRect;
 }
 
 class ListSection {
