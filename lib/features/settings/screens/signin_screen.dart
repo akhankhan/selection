@@ -6,6 +6,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
 import '../services/apple_sign_in_service.dart';
+import '../widgets/legal_terms_footer.dart';
 import 'email_signin_screen.dart';
 
 class SignInScreen extends StatelessWidget {
@@ -169,51 +170,9 @@ class SignInScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Footer disclaimer
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                    child: Text.rich(
-                      TextSpan(
-                        text: 'By continuing, you agree to our ',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: appTheme.subtitle,
-                          height: 1.45,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: 'Terms of Use',
-                            style: TextStyle(
-                              color: context.brandBlue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const TextSpan(
-                            text:
-                                ' and the collection and use of your data as described in our ',
-                          ),
-                          TextSpan(
-                            text: 'Privacy Policy',
-                            style: TextStyle(
-                              color: context.brandBlue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const TextSpan(
-                            text:
-                                '. If you\'d like to opt out or learn more about your data options, please review our ',
-                          ),
-                          TextSpan(
-                            text: 'Privacy Policy',
-                            style: TextStyle(
-                              color: context.brandBlue,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const TextSpan(text: '.'),
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+                  const LegalTermsFooter(
+                    style: LegalTermsFooterStyle.full,
+                    padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
                   ),
                 ],
               ),

@@ -16,6 +16,7 @@ class ListsScreen extends StatefulWidget {
 
 class _ListsScreenState extends State<ListsScreen> {
   final ShoppingListManager _manager = ShoppingListManager();
+  final GlobalKey<AddItemInputState> _addItemKey = GlobalKey();
 
   @override
   void initState() {
@@ -36,14 +37,12 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   void _openAddItem([String? initialListTitle]) {
-    showAddItemInput(
-      context,
-      lists: _manager.sections.map((s) => s.title).toList(),
-      initialList: initialListTitle,
-      onSubmit: (item, listTitle) {
-        _manager.addItem(item, listTitle);
-      },
-    );
+    _addItemKey.currentState?.focusWithList(initialListTitle);
+  }
+
+  void _handleAddItem(String item, String listTitle) {
+    _manager.addItem(item, listTitle);
+    _showSnack('Added "$item" to $listTitle');
   }
 
   void _openDeleteOptions() {
@@ -199,10 +198,23 @@ class _ListsScreenState extends State<ListsScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: EdgeInsets.zero,
+      body: Column(
         children: [
-          for (final section in _manager.sections) ..._buildSection(section),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.only(bottom: 8),
+              children: [
+                for (final section in _manager.sections)
+                  ..._buildSection(section),
+              ],
+            ),
+          ),
+          AddItemInput(
+            key: _addItemKey,
+            embedded: true,
+            lists: _manager.sections.map((s) => s.title).toList(),
+            onSubmit: _handleAddItem,
+          ),
         ],
       ),
     );

@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme_extension.dart';
 import '../services/shopping_list_share_service.dart';
 import '../../settings/screens/email_signin_screen.dart';
 import '../../settings/services/apple_sign_in_service.dart';
+import '../../settings/widgets/legal_terms_footer.dart';
 
 class ShareListSheet extends StatelessWidget {
   ShareListSheet({super.key});
@@ -455,7 +456,9 @@ class ShareListSheet extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      const _TermsText(),
+                      const LegalTermsFooter(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                      ),
                     ],
                   ),
                 ),
@@ -999,43 +1002,4 @@ class _GoogleIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _TermsText extends StatelessWidget {
-  const _TermsText();
-
-  @override
-  Widget build(BuildContext context) {
-    final appTheme = context.appTheme;
-
-    final link = TextStyle(
-      fontSize: 11.5,
-      color: context.brandBlue,
-      fontWeight: FontWeight.w600,
-    );
-    final normal = TextStyle(
-      fontSize: 11.5,
-      color: appTheme.subtitle,
-      height: 1.45,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: 'By continuing, you agree to our ',
-              style: normal,
-            ),
-            TextSpan(text: 'Terms of Use', style: link),
-            TextSpan(text: ' and ', style: normal),
-            TextSpan(text: 'Privacy Policy', style: link),
-            TextSpan(text: '.', style: normal),
-          ],
-        ),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
 }

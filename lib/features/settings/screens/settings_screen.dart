@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/config/legal_documents_service.dart';
 import '../../../core/storage/auto_delete_preferences_store.dart';
 import '../../../core/storage/notification_preferences_store.dart';
@@ -8,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../browse/services/search_history_service.dart';
 import '../../lists/models/shopping_list_manager.dart';
+import '../services/push_notification_service.dart';
 import 'signin_screen.dart';
 import 'edit_profile_screen.dart';
 import 'privacy_choices_screen.dart';
@@ -71,6 +73,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _openLegalDocument(LegalDocumentType type) {
     LegalDocumentsService.instance.open(context, type);
+  }
+
+  void _openAppSettings() {
+    launchUrl(Uri.parse('app-settings:'));
   }
 
   void _showThemePicker() {
@@ -474,28 +480,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Allow Flipp to notify you of the latest deals in your area',
             value: _acceptNotifications,
             onChanged: (val) async {
-              final enabled =
+              final result =
                   await NotificationPreferencesStore.instance.setEnabled(val);
               if (!context.mounted) return;
-              setState(() => _acceptNotifications = enabled);
-              if (val && !enabled) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Notification permission was denied. Enable alerts in device Settings to receive deal notifications.',
-                    ),
-                    backgroundColor: Colors.orange,
-                  ),
-                );
-              } else if (enabled) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Push notifications enabled. You\'ll receive deal alerts for your area.',
-                    ),
-                    backgroundColor: _brandBlue,
-                  ),
-                );
+              setState(() {
+                _acceptNotifications =
+                    NotificationPreferencesStore.instance.enabled;
+              });
+
+              if (val && result != null) {
+                final messenger = ScaffoldMessenger.of(context);
+                switch (result.status) {
+                  case PushRegistrationStatus.permissionDenied:
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result.message ??
+                              'Notification permission was denied.',
+                        ),
+                        backgroundColor: Colors.orange,
+                        action: SnackBarAction(
+                          label: 'Settings',
+                          textColor: Colors.white,
+                          onPressed: _openAppSettings,
+                        ),
+                      ),
+                    );
+                  case PushRegistrationStatus.apnsPending:
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result.message ??
+                              'Notifications enabled. Token will register when the device is ready.',
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                  case PushRegistrationStatus.success:
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Push notifications enabled. You\'ll receive deal alerts for your area.',
+                        ),
+                        backgroundColor: _brandBlue,
+                      ),
+                    );
+                  case PushRegistrationStatus.failed:
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result.message ?? 'Could not enable notifications.',
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                }
               }
             },
           ),

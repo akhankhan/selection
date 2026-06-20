@@ -8,17 +8,19 @@ class AddItemInput extends StatefulWidget {
     required this.lists,
     required this.onSubmit,
     this.initialList,
+    this.embedded = false,
   });
 
   final List<String> lists;
   final String? initialList;
   final void Function(String item, String list) onSubmit;
+  final bool embedded;
 
   @override
-  State<AddItemInput> createState() => _AddItemInputState();
+  State<AddItemInput> createState() => AddItemInputState();
 }
 
-class _AddItemInputState extends State<AddItemInput> {
+class AddItemInputState extends State<AddItemInput> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   late String _selectedList;
@@ -26,10 +28,53 @@ class _AddItemInputState extends State<AddItemInput> {
   @override
   void initState() {
     super.initState();
-    _selectedList = widget.initialList ?? widget.lists.first;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _selectedList = _resolveSelectedList(widget.initialList);
+    if (!widget.embedded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _focusNode.requestFocus();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(AddItemInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.lists != widget.lists ||
+        oldWidget.initialList != widget.initialList) {
+      _selectedList = _resolveSelectedList(widget.initialList ?? _selectedList);
+    }
+  }
+
+  String _resolveSelectedList(String? preferred) {
+    if (widget.lists.isEmpty) return 'My List';
+    if (preferred != null && widget.lists.contains(preferred)) {
+      return preferred;
+    }
+    return widget.lists.first;
+  }
+
+  void focusWithList(String? listTitle) {
+    if (listTitle != null && widget.lists.contains(listTitle)) {
+      setState(() => _selectedList = listTitle);
+    }
+    _focusNode.requestFocus();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isEmpty) {
       _focusNode.requestFocus();
-    });
+      return;
+    }
+
+    widget.onSubmit(value, _selectedList);
+    _controller.clear();
+
+    if (widget.embedded) {
+      _focusNode.requestFocus();
+    } else if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -43,18 +88,20 @@ class _AddItemInputState extends State<AddItemInput> {
   Widget build(BuildContext context) {
     final theme = context.appTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final lists = widget.lists.isEmpty ? const ['My List'] : widget.lists;
 
     return Material(
       color: theme.cardSurface,
       child: SafeArea(
         top: false,
-        minimum: const EdgeInsets.only(bottom: 12),
+        minimum: EdgeInsets.only(bottom: widget.embedded ? 8 : 12),
         child: Padding(
           padding: EdgeInsets.only(
             left: 12,
             right: 12,
-            top: 10,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 8,
+            top: widget.embedded ? 8 : 10,
+            bottom: MediaQuery.of(context).viewInsets.bottom +
+                (widget.embedded ? 4 : 8),
           ),
           child: Container(
             decoration: BoxDecoration(
@@ -69,11 +116,7 @@ class _AddItemInputState extends State<AddItemInput> {
                     controller: _controller,
                     focusNode: _focusNode,
                     textInputAction: TextInputAction.done,
-                    onSubmitted: (value) {
-                      if (value.trim().isEmpty) return;
-                      widget.onSubmit(value.trim(), _selectedList);
-                      Navigator.of(context).pop();
-                    },
+                    onSubmitted: (_) => _submit(),
                     decoration: InputDecoration(
                       hintText: 'Add Item',
                       hintStyle: TextStyle(color: context.brandBlue),
@@ -94,7 +137,9 @@ class _AddItemInputState extends State<AddItemInput> {
                 ),
                 DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
-                    value: _selectedList,
+                    value: lists.contains(_selectedList)
+                        ? _selectedList
+                        : lists.first,
                     icon: Icon(
                       Icons.keyboard_arrow_down,
                       color: theme.subtitle,
@@ -103,7 +148,7 @@ class _AddItemInputState extends State<AddItemInput> {
                       fontSize: 14,
                       color: colorScheme.onSurface,
                     ),
-                    items: widget.lists
+                    items: lists
                         .map(
                           (l) => DropdownMenuItem(value: l, child: Text(l)),
                         )
@@ -122,12 +167,7 @@ class _AddItemInputState extends State<AddItemInput> {
                     color: context.brandBlue,
                     size: 32,
                   ),
-                  onPressed: () {
-                    final value = _controller.text;
-                    if (value.trim().isEmpty) return;
-                    widget.onSubmit(value.trim(), _selectedList);
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: _submit,
                 ),
               ],
             ),

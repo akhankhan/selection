@@ -8,6 +8,24 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/notification_preferences_store.dart';
 
+enum PushRegistrationStatus {
+  success,
+  permissionDenied,
+  apnsPending,
+  failed,
+}
+
+class PushRegistrationResult {
+  const PushRegistrationResult(this.status, {this.message});
+
+  final PushRegistrationStatus status;
+  final String? message;
+
+  bool get isEnabledInApp =>
+      status == PushRegistrationStatus.success ||
+      status == PushRegistrationStatus.apnsPending;
+}
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -20,6 +38,7 @@ class PushNotificationService {
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   bool _initialized = false;
+  bool _loggedApnsPending = false;
 
   Future<void> initialize() async {
     if (_initialized || kIsWeb) return;
@@ -47,13 +66,17 @@ class PushNotificationService {
   }
 
   Future<void> _registerWhenReady() async {
-    // APNS is often unavailable during cold start on iOS — defer briefly.
     await Future<void>.delayed(const Duration(milliseconds: 1200));
     await registerForPush();
   }
 
-  Future<bool> registerForPush() async {
-    if (kIsWeb) return false;
+  Future<PushRegistrationResult> registerForPush() async {
+    if (kIsWeb) {
+      return const PushRegistrationResult(
+        PushRegistrationStatus.failed,
+        message: 'Push notifications are not supported on web.',
+      );
+    }
 
     try {
       final settings = await _messaging.requestPermission(
@@ -62,19 +85,46 @@ class PushNotificationService {
         sound: true,
       );
 
-      final authorized =
-          settings.authorizationStatus == AuthorizationStatus.authorized ||
-              settings.authorizationStatus == AuthorizationStatus.provisional;
-      if (!authorized) return false;
+      final status = settings.authorizationStatus;
+      if (status == AuthorizationStatus.denied) {
+        return const PushRegistrationResult(
+          PushRegistrationStatus.permissionDenied,
+          message:
+              'Notification permission was denied. Turn on alerts in iPhone Settings → Selection → Notifications.',
+        );
+      }
+
+      final authorized = status == AuthorizationStatus.authorized ||
+          status == AuthorizationStatus.provisional;
+      if (!authorized) {
+        return const PushRegistrationResult(
+          PushRegistrationStatus.permissionDenied,
+          message:
+              'Notification permission is off. Enable alerts in iPhone Settings.',
+        );
+      }
 
       final token = await _getFcmTokenSafely();
       if (token != null) {
         await _syncTokenToFirestore(token);
+        return const PushRegistrationResult(PushRegistrationStatus.success);
       }
-      return token != null;
+
+      await syncPreferenceToFirestore();
+      unawaited(_retryTokenRegistration());
+
+      return PushRegistrationResult(
+        PushRegistrationStatus.apnsPending,
+        message: defaultTargetPlatform == TargetPlatform.iOS
+            ? 'Notifications are on. iOS Simulator often cannot get a push token — use a real iPhone to test alerts.'
+            : 'Notifications are on. Finishing device registration…',
+      );
     } catch (e, stack) {
       debugPrint('[FCM] registerForPush failed: $e\n$stack');
-      return false;
+      return PushRegistrationResult(
+        PushRegistrationStatus.failed,
+        message: 'Could not enable push notifications. Try again.',
+      );
     }
   }
 
@@ -82,25 +132,46 @@ class PushNotificationService {
     if (kIsWeb) return;
 
     try {
-      final token = await _getFcmTokenSafely();
-      await _messaging.deleteToken();
-      await _clearTokenFromFirestore(token);
+      try {
+        await _messaging.deleteToken();
+      } on FirebaseException catch (e) {
+        if (e.code != 'apns-token-not-set') rethrow;
+      }
+      await _clearTokenFromFirestore();
     } catch (e) {
-      debugPrint('[FCM] unregister failed: $e');
+      debugPrint('[FCM] unregister note: $e');
+      await _clearTokenFromFirestore();
     }
   }
 
-  Future<String?> _getFcmTokenSafely() async {
+  Future<void> _retryTokenRegistration({int attempts = 8}) async {
+    for (var i = 0; i < attempts; i++) {
+      await Future<void>.delayed(Duration(seconds: 2 + i));
+      if (!NotificationPreferencesStore.instance.enabled) return;
+
+      final token = await _getFcmTokenSafely(logPending: false);
+      if (token != null) {
+        await _syncTokenToFirestore(token);
+        debugPrint('[FCM] token registered after retry');
+        return;
+      }
+    }
+  }
+
+  Future<String?> _getFcmTokenSafely({bool logPending = true}) async {
     try {
       if (defaultTargetPlatform == TargetPlatform.iOS) {
-        await _waitForApnsToken();
+        await _waitForApnsToken(maxAttempts: logPending ? 8 : 3);
       }
       return await _messaging.getToken();
     } on FirebaseException catch (e) {
       if (e.code == 'apns-token-not-set') {
-        debugPrint(
-          '[FCM] APNS token not ready — push will register when available.',
-        );
+        if (logPending && !_loggedApnsPending) {
+          _loggedApnsPending = true;
+          debugPrint(
+            '[FCM] APNS token not ready yet — will retry when available.',
+          );
+        }
         return null;
       }
       debugPrint('[FCM] getToken failed: ${e.code} ${e.message}');
@@ -146,7 +217,7 @@ class PushNotificationService {
     );
   }
 
-  Future<void> _clearTokenFromFirestore(String? token) async {
+  Future<void> _clearTokenFromFirestore() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
