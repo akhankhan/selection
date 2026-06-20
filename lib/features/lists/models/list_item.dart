@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 class ListItem {
   ListItem({
+    String? id,
     required this.name,
     required this.thumbnail,
     this.saveText,
@@ -15,9 +16,17 @@ class ListItem {
     this.expiresAt,
     this.flyerPageImageUrl,
     this.flyerCropRect,
-  });
+  }) : id = id ?? _newId();
 
-  final String name;
+  static int _idCounter = 0;
+
+  static String _newId() {
+    _idCounter += 1;
+    return 'item_${DateTime.now().microsecondsSinceEpoch}_$_idCounter';
+  }
+
+  final String id;
+  String name;
   final Widget thumbnail;
   final String? saveText;
   final String? salePrefix;

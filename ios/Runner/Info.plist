@@ -64,6 +64,16 @@
 				<string>com.googleusercontent.apps.699002286605-mj636am0m7lt2hr2ra0gs859sem6kaao</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.menu2go.expressapp.invite</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>menu2goexpress</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

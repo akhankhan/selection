@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/storage/location_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
@@ -75,6 +76,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     _searchController.addListener(_onSearchTextChanged);
     FavoritesStore.instance.addListener(_onBrowseDataChanged);
     LocationStore.instance.addListener(_onBrowseDataChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppNavigator.handlePendingInviteIfAny();
+    });
   }
 
   void _onBrowseDataChanged() {

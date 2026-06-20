@@ -1,5 +1,6 @@
 class PersistedListItem {
   const PersistedListItem({
+    required this.id,
     required this.name,
     required this.sectionTitle,
     this.qty = 1,
@@ -17,6 +18,7 @@ class PersistedListItem {
     this.cropBottom,
   });
 
+  final String id;
   final String name;
   final String sectionTitle;
   final int qty;
@@ -42,6 +44,7 @@ class PersistedListItem {
       cropBottom != null;
 
   Map<String, dynamic> toJson() => {
+    'id': id,
     'name': name,
     'sectionTitle': sectionTitle,
     'qty': qty,
@@ -60,7 +63,11 @@ class PersistedListItem {
   };
 
   factory PersistedListItem.fromJson(Map<String, dynamic> json) {
+    final rawId = json['id'] as String?;
     return PersistedListItem(
+      id: rawId == null || rawId.isEmpty
+          ? 'legacy_${json.hashCode}_${DateTime.now().microsecondsSinceEpoch}'
+          : rawId,
       name: (json['name'] as String?) ?? '',
       sectionTitle: (json['sectionTitle'] as String?) ?? 'My List',
       qty: (json['qty'] as num?)?.toInt() ?? 1,

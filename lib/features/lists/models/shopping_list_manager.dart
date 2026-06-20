@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/services/account_sync_service.dart';
+import '../../../core/storage/auto_delete_preferences_store.dart';
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/widgets/product_thumbnail.dart';
 import '../models/list_item.dart';
@@ -10,7 +13,6 @@ import '../services/shopping_list_storage.dart';
 import '../utils/flyer_date_parser.dart';
 import '../widgets/flyer_list_thumbnail.dart';
 import '../widgets/mock_thumbnails.dart';
-import '../../../core/storage/auto_delete_preferences_store.dart';
 
 class ShoppingListManager extends ChangeNotifier {
   ShoppingListManager._();
@@ -196,6 +198,71 @@ class ShoppingListManager extends ChangeNotifier {
     _notifyAndPersist();
   }
 
+  void removeItem(ListItem item) {
+    for (final section in _sections) {
+      final before = section.items.length;
+      section.items.removeWhere((candidate) => candidate.id == item.id);
+      if (section.items.length != before) {
+        if (section.items.isEmpty && section.title != _myListTitle) {
+          _sections.remove(section);
+        }
+        _notifyAndPersist();
+        return;
+      }
+    }
+  }
+
+  void renameItem(ListItem item, String newName) {
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty || trimmed == item.name) return;
+    item.name = trimmed;
+    _notifyAndPersist();
+  }
+
+  void reorderItemsInSection(String sectionTitle, int oldIndex, int newIndex) {
+    final section = _findSection(sectionTitle);
+    if (section == null) return;
+    if (oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= section.items.length ||
+        newIndex >= section.items.length) {
+      return;
+    }
+    if (oldIndex == newIndex) return;
+    final moved = section.items.removeAt(oldIndex);
+    section.items.insert(newIndex, moved);
+    _notifyAndPersist();
+  }
+
+  Future<void> importPersisted(PersistedShoppingList data) async {
+    _applyPersistedItems(data.items);
+    _loaded = true;
+    notifyListeners();
+    await _persist();
+  }
+
+  Future<void> mergeSharedItems(List<PersistedListItem> sharedItems) async {
+    if (sharedItems.isEmpty) return;
+
+    final existingIds = <String>{
+      for (final section in _sections)
+        for (final item in section.items) item.id,
+    };
+
+    for (final persisted in sharedItems) {
+      if (existingIds.contains(persisted.id)) continue;
+      var section = _findSection(persisted.sectionTitle);
+      if (section == null) {
+        section = ListSection(title: persisted.sectionTitle, items: []);
+        _sections.add(section);
+      }
+      section.items.add(_itemFromPersisted(persisted));
+      existingIds.add(persisted.id);
+    }
+
+    _notifyAndPersist();
+  }
+
   int deleteChecked() {
     var removed = 0;
     for (final section in _sections) {
@@ -269,6 +336,7 @@ class ShoppingListManager extends ChangeNotifier {
     }
 
     return ListItem(
+      id: persisted.id,
       name: persisted.name,
       thumbnail: _buildThumbnail(
         pageImageUrl: persisted.pageImageUrl,
@@ -334,6 +402,7 @@ class ShoppingListManager extends ChangeNotifier {
       for (final item in section.items) {
         items.add(
           PersistedListItem(
+            id: item.id,
             name: item.name,
             sectionTitle: section.title,
             qty: item.qty,
@@ -357,9 +426,26 @@ class ShoppingListManager extends ChangeNotifier {
     await ShoppingListStorage.save(PersistedShoppingList(items: items));
   }
 
+  void _applyPersistedItems(List<PersistedListItem> items) {
+    final sectionMap = <String, List<ListItem>>{};
+    for (final persisted in items) {
+      sectionMap.putIfAbsent(persisted.sectionTitle, () => []);
+      sectionMap[persisted.sectionTitle]!.add(_itemFromPersisted(persisted));
+    }
+
+    _sections = sectionMap.entries
+        .map((entry) => ListSection(title: entry.key, items: entry.value))
+        .toList();
+
+    if (_findSection(_myListTitle) == null) {
+      _sections.insert(0, ListSection(title: _myListTitle, items: []));
+    }
+  }
+
   void _notifyAndPersist() {
     notifyListeners();
-    _persist();
+    unawaited(_persist());
+    unawaited(AccountSyncService.instance.markShoppingListChangedLocally());
   }
 
   ListSection? _findSection(String title) {

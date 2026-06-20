@@ -8,7 +8,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'core/navigation/app_navigator.dart';
+import 'core/services/account_sync_service.dart';
 import 'core/services/analytics_service.dart';
+import 'core/services/invite_deep_link_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/storage/auto_delete_preferences_store.dart';
@@ -54,7 +57,11 @@ Future<void> main() async {
     serverClientId:
         '699002286605-cr66fkq10usnoisphf6vmna1i62vo61a.apps.googleusercontent.com',
   );
-  FirebaseAuth.instance.authStateChanges().listen(_syncUserToFirestore);
+  FirebaseAuth.instance.authStateChanges().listen((user) async {
+    if (user == null) return;
+    await _syncUserToFirestore(user);
+    await AccountSyncService.instance.syncForUser(user);
+  });
   runApp(const MyApp());
 }
 
@@ -88,8 +95,27 @@ Future<void> _syncUserToFirestore(User? user) async {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    InviteDeepLinkService.instance.initialize(
+      onCode: AppNavigator.openInviteJoin,
+    );
+  }
+
+  @override
+  void dispose() {
+    InviteDeepLinkService.instance.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +123,7 @@ class MyApp extends StatelessWidget {
       listenable: ThemeController.instance,
       builder: (context, _) {
         return MaterialApp(
+          navigatorKey: AppNavigator.key,
           title: 'Selection Flyer Viewer',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,

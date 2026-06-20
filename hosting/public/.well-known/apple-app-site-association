@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "ZA2H9GGNQ8.com.menu2go.expressapp",
+        "paths": ["/join/*"]
+      }
+    ]
+  }
+}

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/account_sync_service.dart';
+
 class FavoritesStore extends ChangeNotifier {
   FavoritesStore._();
 
@@ -61,5 +63,6 @@ class FavoritesStore extends ChangeNotifier {
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_key, _orderedIds);
+    await AccountSyncService.instance.markFavoritesChangedLocally();
   }
 }

@@ -1,7 +1,12 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
+import '../../settings/widgets/sign_in_required_gate.dart';
 import '../models/list_item.dart';
 import '../models/shopping_list_manager.dart';
 import '../widgets/add_item_input.dart';
@@ -18,15 +23,25 @@ class ListsScreen extends StatefulWidget {
 class _ListsScreenState extends State<ListsScreen> {
   final ShoppingListManager _manager = ShoppingListManager();
   final GlobalKey<AddItemInputState> _addItemKey = GlobalKey();
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     _manager.addListener(_onManagerUpdate);
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (user != null && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          AppNavigator.handlePendingInviteIfAny();
+        });
+      }
+      if (mounted) setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _manager.removeListener(_onManagerUpdate);
     super.dispose();
   }
@@ -44,6 +59,64 @@ class _ListsScreenState extends State<ListsScreen> {
   void _handleAddItem(String item, String listTitle) {
     _manager.addItem(item, listTitle);
     _showSnack('Added "$item" to $listTitle');
+  }
+
+  Future<void> _renameItem(ListItem item) async {
+    final controller = TextEditingController(text: item.name);
+    final appTheme = context.appTheme;
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: appTheme.cardSurface,
+          title: Text(
+            'Rename item',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: appTheme.navyText,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(hintText: 'Item name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel', style: TextStyle(color: appTheme.subtitle)),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, controller.text.trim()),
+              child: Text(
+                'Save',
+                style: TextStyle(
+                  color: context.brandBlue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (newName == null || newName.isEmpty || !mounted) return;
+    _manager.renameItem(item, newName);
+    _showSnack('Renamed to "$newName"');
+  }
+
+  Future<void> _confirmRemoveItem(ListItem item) async {
+    final confirmed = await _confirmDelete(
+      title: 'Remove item?',
+      message: 'Remove "${item.name}" from your list?',
+      confirmLabel: 'Remove',
+    );
+    if (!confirmed || !mounted) return;
+    _manager.removeItem(item);
+    _showSnack('Removed "${item.name}"');
   }
 
   void _openDeleteOptions() {
@@ -170,12 +243,31 @@ class _ListsScreenState extends State<ListsScreen> {
     _showSnack('Removed $removed item${removed == 1 ? '' : 's'}.');
   }
 
-  void _openShareSheet() {
+  void _openShareSheet() async {
+    if (!await ensureSignedIn(context)) return;
+    if (!mounted) return;
     ShareListSheet.show(context);
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(title: const Text('Lists')),
+        body: const SignInRequiredGate(
+          title: 'Sign in to use your lists',
+          message:
+              'Your shopping lists, sync, and sharing are available after you sign in.',
+        ),
+      );
+    }
+
+    return _buildSignedInScaffold(context);
+  }
+
+  Widget _buildSignedInScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -236,11 +328,24 @@ class _ListsScreenState extends State<ListsScreen> {
         title: section.title,
         onAdd: () => _openAddItem(section.title),
       ),
-      for (final item in section.items)
-        _ItemRow(
-          item: item,
-          onCheckChanged: (v) => _manager.setChecked(item, v),
-          onQtyChanged: (v) => _manager.setQty(item, v),
+      if (section.items.isEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Text(
+            'No items in this list yet.',
+            style: TextStyle(color: context.appTheme.subtitle),
+          ),
+        )
+      else
+        ...section.items.map(
+          (item) => _ItemRow(
+            key: ValueKey(item.id),
+            item: item,
+            onCheckChanged: (v) => _manager.setChecked(item, v),
+            onQtyChanged: (v) => _manager.setQty(item, v),
+            onRename: () => _renameItem(item),
+            onDelete: () => _confirmRemoveItem(item),
+          ),
         ),
     ];
   }
@@ -296,125 +401,149 @@ class _SectionHeader extends StatelessWidget {
 
 class _ItemRow extends StatelessWidget {
   const _ItemRow({
+    super.key,
     required this.item,
     required this.onCheckChanged,
     required this.onQtyChanged,
+    required this.onRename,
+    required this.onDelete,
   });
 
   final ListItem item;
   final ValueChanged<bool> onCheckChanged;
   final ValueChanged<int> onQtyChanged;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final theme = context.appTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Column(
-      children: [
-        Container(
-          color: theme.cardSurface,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: _CustomCheckbox(
-                  value: item.checked,
-                  onChanged: onCheckChanged,
-                ),
-              ),
-              const SizedBox(width: 12),
-              item.thumbnail,
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
+    return Dismissible(
+      key: ValueKey('dismiss_${item.id}'),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        color: colorScheme.error,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete_outline, color: Colors.white),
+      ),
+      confirmDismiss: (_) async {
+        onDelete();
+        return false;
+      },
+      child: Column(
+        children: [
+          Material(
+            color: theme.cardSurface,
+            child: InkWell(
+              onLongPress: onRename,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.name,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: item.checked
-                            ? colorScheme.onSurface.withValues(alpha: 0.38)
-                            : colorScheme.onSurface,
-                        decoration: item.checked
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                        height: 1.25,
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: _CustomCheckbox(
+                        value: item.checked,
+                        onChanged: onCheckChanged,
                       ),
                     ),
-                    if (item.saveText != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        item.saveText!,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFFD23A28),
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                    if (item.priceText != null) ...[
-                      const SizedBox(height: 1),
-                      if (item.salePrefix != null)
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '${item.salePrefix!} ',
+                    const SizedBox(width: 12),
+                    item.thumbnail,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.name,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: item.checked
+                                  ? colorScheme.onSurface.withValues(alpha: 0.38)
+                                  : colorScheme.onSurface,
+                              decoration: item.checked
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              height: 1.25,
+                            ),
+                          ),
+                          if (item.saveText != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              item.saveText!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colorScheme.error,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                          if (item.priceText != null) ...[
+                            const SizedBox(height: 1),
+                            if (item.salePrefix != null)
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${item.salePrefix!} ',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: colorScheme.onSurface,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: item.priceText!,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: colorScheme.onSurface,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else
+                              Text(
+                                item.priceText!,
                                 style: TextStyle(
                                   fontSize: 15,
                                   color: colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              TextSpan(
-                                text: item.priceText!,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: colorScheme.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          ],
+                          if (item.subtitle != null) ...[
+                            const SizedBox(height: 1),
+                            Text(
+                              item.subtitle!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.subtitle,
                               ),
-                            ],
-                          ),
-                        )
-                      else
-                        Text(
-                          item.priceText!,
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                    ],
-                    if (item.subtitle != null) ...[
-                      const SizedBox(height: 1),
-                      Text(
-                        item.subtitle!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.subtitle,
-                        ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: _QtyButton(qty: item.qty, onChanged: onQtyChanged),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: _QtyButton(qty: item.qty, onChanged: onQtyChanged),
-              ),
-            ],
+            ),
           ),
-        ),
-        Divider(height: 1, color: theme.border, thickness: 1),
-      ],
+          Divider(height: 1, color: theme.border, thickness: 1),
+        ],
+      ),
     );
   }
 }

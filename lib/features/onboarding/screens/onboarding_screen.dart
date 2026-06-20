@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/navigation/app_navigator.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/storage/onboarding_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
@@ -50,6 +51,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => const BrowseScreen()),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppNavigator.handlePendingInviteIfAny();
+    });
   }
 
   void _next() {

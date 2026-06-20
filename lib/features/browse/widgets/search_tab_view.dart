@@ -4,9 +4,11 @@ import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
+import '../models/search_filters.dart';
 import '../models/search_results.dart';
 import '../services/deals_search_service.dart';
 import '../services/search_history_service.dart';
+import 'search_filters_sheet.dart';
 
 class SearchTabView extends StatefulWidget {
   const SearchTabView({
@@ -32,6 +34,7 @@ class SearchTabView extends StatefulWidget {
 class _SearchTabViewState extends State<SearchTabView> {
   List<String> _recentSearches = [];
   SearchResults _results = SearchResults.empty;
+  SearchFilters _filters = SearchFilters.none;
 
   @override
   void initState() {
@@ -59,8 +62,22 @@ class _SearchTabViewState extends State<SearchTabView> {
 
   void _runSearch(String query) {
     setState(() {
-      _results = DealsSearchService.search(widget.stores, query);
+      _results = DealsSearchService.search(
+        widget.stores,
+        query,
+        filters: _filters,
+      );
     });
+  }
+
+  Future<void> _openFilters() async {
+    final updated = await SearchFiltersSheet.show(
+      context,
+      initialFilters: _filters,
+    );
+    if (updated == null || !mounted) return;
+    setState(() => _filters = updated);
+    _runSearch(widget.searchController.text);
   }
 
   Future<void> _applySearch(String query) async {
@@ -87,38 +104,101 @@ class _SearchTabViewState extends State<SearchTabView> {
     final appTheme = context.appTheme;
     final query = widget.searchController.text.trim();
     final hasQuery = query.isNotEmpty;
+    final showResults = hasQuery || _filters.hasActiveFilters;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: TextField(
-            controller: widget.searchController,
-            focusNode: widget.searchFocusNode,
-            textInputAction: TextInputAction.search,
-            onSubmitted: _applySearch,
-            decoration: InputDecoration(
-              hintText: 'Search deals and stores',
-              prefixIcon: Icon(Icons.search, color: appTheme.subtitle),
-              suffixIcon: hasQuery
-                  ? IconButton(
-                      icon: Icon(Icons.close, color: appTheme.subtitle),
-                      onPressed: _clearSearch,
-                    )
-                  : null,
-              filled: true,
-              fillColor: appTheme.searchFill,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide.none,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: widget.searchController,
+                  focusNode: widget.searchFocusNode,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: _applySearch,
+                  decoration: InputDecoration(
+                    hintText: 'Search deals and stores',
+                    prefixIcon: Icon(Icons.search, color: appTheme.subtitle),
+                    suffixIcon: hasQuery
+                        ? IconButton(
+                            icon: Icon(Icons.close, color: appTheme.subtitle),
+                            onPressed: _clearSearch,
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: appTheme.searchFill,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Filters',
+                onPressed: _openFilters,
+                style: IconButton.styleFrom(
+                  backgroundColor: _filters.hasActiveFilters
+                      ? context.brandBlue.withValues(alpha: 0.12)
+                      : appTheme.searchFill,
+                ),
+                icon: Icon(
+                  Icons.tune,
+                  color: _filters.hasActiveFilters
+                      ? context.brandBlue
+                      : appTheme.subtitle,
+                ),
+              ),
+            ],
           ),
         ),
+        if (_filters.hasActiveFilters)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (_filters.minPrice != null)
+                  Chip(
+                    label: Text('Min \$${_filters.minPrice!.toStringAsFixed(2)}'),
+                    onDeleted: () {
+                      setState(() {
+                        _filters = _filters.copyWith(clearMinPrice: true);
+                      });
+                      _runSearch(widget.searchController.text);
+                    },
+                  ),
+                if (_filters.maxPrice != null)
+                  Chip(
+                    label: Text('Max \$${_filters.maxPrice!.toStringAsFixed(2)}'),
+                    onDeleted: () {
+                      setState(() {
+                        _filters = _filters.copyWith(clearMaxPrice: true);
+                      });
+                      _runSearch(widget.searchController.text);
+                    },
+                  ),
+                if (_filters.category != null)
+                  Chip(
+                    label: Text(_filters.category!),
+                    onDeleted: () {
+                      setState(() {
+                        _filters = _filters.copyWith(clearCategory: true);
+                      });
+                      _runSearch(widget.searchController.text);
+                    },
+                  ),
+              ],
+            ),
+          ),
         Expanded(
-          child: hasQuery ? _buildResults(query) : _buildRecentSearches(),
+          child: showResults ? _buildResults(query) : _buildRecentSearches(),
         ),
       ],
     );
@@ -185,10 +265,13 @@ class _SearchTabViewState extends State<SearchTabView> {
   }
 
   Widget _buildEmptyResults(String query) {
+    final message = query.isEmpty
+        ? 'Try changing your filters or search for a store or product.'
+        : 'Try a different store name or product keyword.';
     return EmptyStateView(
       icon: Icons.search_off_outlined,
-      title: 'No results for "$query"',
-      message: 'Try a different store name or product keyword.',
+      title: query.isEmpty ? 'No matching deals' : 'No results for "$query"',
+      message: message,
     );
   }
 
