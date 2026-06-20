@@ -48,6 +48,42 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:699002286605:android:d2a585ee99dcc76759db44",
+        "android_client_info": {
+          "package_name": "com.menu2go.express"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "699002286605-cr66fkq10usnoisphf6vmna1i62vo61a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYFjROdK7QgXZL2TPmpFRhvNyJI197RTk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "699002286605-cr66fkq10usnoisphf6vmna1i62vo61a.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "699002286605-6oa40u9chkn6qgggn2k8pc6tb79di8vq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.selection"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

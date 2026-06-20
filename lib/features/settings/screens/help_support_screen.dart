@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme_extension.dart';
+
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
 
@@ -8,7 +10,6 @@ class HelpSupportScreen extends StatefulWidget {
 }
 
 class _HelpSupportScreenState extends State<HelpSupportScreen> {
-  static const Color _brandBlue = Color(0xFF0071CE);
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -42,6 +43,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
+
     final filteredFaqs = _faqs.where((faq) {
       final query = _searchQuery.toLowerCase();
       return faq['question']!.toLowerCase().contains(query) ||
@@ -49,26 +53,23 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Help & Support',
           style: TextStyle(
-            color: Colors.black,
+            color: colorScheme.onSurface,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: appTheme.border),
         ),
       ),
       body: SingleChildScrollView(
@@ -76,20 +77,22 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hero section with help message
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [_brandBlue, _brandBlue.withValues(alpha: 0.85)],
+                  colors: [
+                    context.brandBlue,
+                    context.brandBlue.withValues(alpha: 0.85),
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: _brandBlue.withValues(alpha: 0.2),
+                    color: context.brandBlue.withValues(alpha: 0.2),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -120,16 +123,15 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Search Bar
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search for articles, questions...',
-                hintStyle: TextStyle(color: Colors.grey[500], fontSize: 15),
-                prefixIcon: const Icon(Icons.search, color: _brandBlue),
+                hintStyle: TextStyle(color: appTheme.subtitle, fontSize: 15),
+                prefixIcon: Icon(Icons.search, color: context.brandBlue),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        icon: Icon(Icons.clear, color: appTheme.subtitle),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -137,7 +139,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       )
                     : null,
                 filled: true,
-                fillColor: const Color(0xFFF5F7FA),
+                fillColor: appTheme.searchFill,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -149,7 +151,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: _brandBlue, width: 1.5),
+                  borderSide: BorderSide(
+                    color: context.brandBlue,
+                    width: 1.5,
+                  ),
                 ),
               ),
               onChanged: (val) {
@@ -158,18 +163,16 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             ),
             const SizedBox(height: 28),
 
-            // FAQ Title
-            const Text(
+            Text(
               'Frequently Asked Questions',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: appTheme.navyText,
               ),
             ),
             const SizedBox(height: 12),
 
-            // FAQs List
             if (filteredFaqs.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
@@ -179,12 +182,15 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       Icon(
                         Icons.search_off_outlined,
                         size: 48,
-                        color: Colors.grey[400],
+                        color: appTheme.subtitle,
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'No FAQs found matching "$_searchQuery"',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                        style: TextStyle(
+                          color: appTheme.subtitle,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -200,12 +206,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                 itemBuilder: (context, index) {
                   final faq = filteredFaqs[index];
                   return Card(
-                    color: Colors.white,
+                    color: colorScheme.surface,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(
-                        color: Color(0xFFE2E8F0),
+                      side: BorderSide(
+                        color: appTheme.listSectionBorder,
                         width: 1,
                       ),
                     ),
@@ -218,13 +224,13 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       ),
                       title: Text(
                         faq['question']!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
-                          color: Color(0xFF1E293B),
+                          color: appTheme.navyText,
                         ),
                       ),
-                      iconColor: _brandBlue,
+                      iconColor: context.brandBlue,
                       childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       expandedAlignment: Alignment.topLeft,
                       children: [
@@ -232,7 +238,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                           faq['answer']!,
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey[700],
+                            color: appTheme.subtitle,
                             height: 1.45,
                           ),
                         ),
@@ -243,24 +249,23 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               ),
             const SizedBox(height: 32),
 
-            // Still need help section
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: appTheme.sectionBg,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: appTheme.listSectionBorder),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.support_agent, size: 48, color: _brandBlue),
+                  Icon(Icons.support_agent, size: 48, color: context.brandBlue),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Still need assistance?',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: Color(0xFF1E293B),
+                      color: appTheme.navyText,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -269,7 +274,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[600],
+                      color: appTheme.subtitle,
                       height: 1.35,
                     ),
                   ),
@@ -280,19 +285,19 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                         child: OutlinedButton.icon(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
+                              SnackBar(
+                                content: const Text(
                                   'Support ticket created. We will email you shortly!',
                                 ),
-                                backgroundColor: _brandBlue,
+                                backgroundColor: context.brandBlue,
                               ),
                             );
                           },
                           icon: const Icon(Icons.email_outlined, size: 18),
                           label: const Text('Email Us'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: _brandBlue,
-                            side: const BorderSide(color: _brandBlue),
+                            foregroundColor: context.brandBlue,
+                            side: BorderSide(color: context.brandBlue),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -304,11 +309,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
+                              SnackBar(
+                                content: const Text(
                                   'Connecting to live chat agent...',
                                 ),
-                                backgroundColor: _brandBlue,
+                                backgroundColor: context.brandBlue,
                               ),
                             );
                           },
@@ -322,7 +327,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                             style: TextStyle(color: Colors.white),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _brandBlue,
+                            backgroundColor: context.brandBlue,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),

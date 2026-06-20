@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme_extension.dart';
 import '../models/list_item.dart';
 import '../models/shopping_list_manager.dart';
 import '../widgets/add_item_input.dart';
@@ -48,14 +49,125 @@ class _ListsScreenState extends State<ListsScreen> {
   void _openDeleteOptions() {
     DeleteOptionsSheet.show(
       context,
-      onDeleteExpired: () {},
-      onDeleteChecked: () {
-        _manager.deleteChecked();
-      },
-      onDeleteAll: () {
-        _manager.deleteAll();
+      expiredCount: _manager.expiredCount,
+      checkedCount: _manager.checkedCount,
+      totalCount: _manager.totalItemCount,
+      onDeleteExpired: () => _handleDeleteExpired(),
+      onDeleteChecked: () => _handleDeleteChecked(),
+      onDeleteAll: () => _handleDeleteAll(),
+    );
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: context.brandBlue,
+      ),
+    );
+  }
+
+  Future<bool> _confirmDelete({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final appTheme = context.appTheme;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: appTheme.cardSurface,
+          title: Text(
+            title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: appTheme.navyText,
+            ),
+          ),
+          content: Text(message, style: TextStyle(color: appTheme.subtitle)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text('Cancel', style: TextStyle(color: appTheme.subtitle)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(
+                confirmLabel,
+                style: const TextStyle(
+                  color: Color(0xFFD23A28),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
       },
     );
+
+    return confirmed ?? false;
+  }
+
+  Future<void> _handleDeleteExpired() async {
+    final count = _manager.expiredCount;
+    if (count == 0) {
+      _showSnack('No expired items to delete.');
+      return;
+    }
+
+    final confirmed = await _confirmDelete(
+      title: 'Delete expired items?',
+      message:
+          'Remove $count expired deal${count == 1 ? '' : 's'} from your lists?',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+
+    final removed = _manager.deleteExpired();
+    _showSnack(
+      removed == 0
+          ? 'No expired items to delete.'
+          : 'Removed $removed expired item${removed == 1 ? '' : 's'}.',
+    );
+  }
+
+  Future<void> _handleDeleteChecked() async {
+    final count = _manager.checkedCount;
+    if (count == 0) {
+      _showSnack('No checked items to delete.');
+      return;
+    }
+
+    final confirmed = await _confirmDelete(
+      title: 'Delete checked items?',
+      message: 'Remove $count checked item${count == 1 ? '' : 's'}?',
+      confirmLabel: 'Delete',
+    );
+    if (!confirmed || !mounted) return;
+
+    final removed = _manager.deleteChecked();
+    _showSnack('Removed $removed checked item${removed == 1 ? '' : 's'}.');
+  }
+
+  Future<void> _handleDeleteAll() async {
+    final count = _manager.totalItemCount;
+    if (count == 0) {
+      _showSnack('Your lists are already empty.');
+      return;
+    }
+
+    final confirmed = await _confirmDelete(
+      title: 'Delete all items?',
+      message:
+          'This will remove all $count items from every list. This cannot be undone.',
+      confirmLabel: 'Delete all',
+    );
+    if (!confirmed || !mounted) return;
+
+    final removed = _manager.deleteAll();
+    _showSnack('Removed $removed item${removed == 1 ? '' : 's'}.');
   }
 
   void _openShareSheet() {
@@ -65,36 +177,22 @@ class _ListsScreenState extends State<ListsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.maybePop(context),
-        ),
-        title: const Text(
-          'Lists',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-          ),
-        ),
+        title: const Text('Lists'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add, color: Color(0xFF0071CE), size: 28),
+            icon: Icon(Icons.add, color: context.brandBlue, size: 28),
             onPressed: _openAddItem,
           ),
           IconButton(
-            icon: const Icon(Icons.delete, color: Color(0xFF0071CE), size: 26),
+            icon: Icon(Icons.delete, color: context.brandBlue, size: 26),
             onPressed: _openDeleteOptions,
           ),
           IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.person_add_alt_1,
-              color: Color(0xFF0071CE),
+              color: context.brandBlue,
               size: 26,
             ),
             onPressed: _openShareSheet,
@@ -134,12 +232,14 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.appTheme;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF2F5F9),
+      decoration: BoxDecoration(
+        color: theme.listSectionBg,
         border: Border(
-          top: BorderSide(color: Color(0xFFE2E7ED), width: 1.0),
-          bottom: BorderSide(color: Color(0xFFE2E7ED), width: 1.0),
+          top: BorderSide(color: theme.listSectionBorder, width: 1.0),
+          bottom: BorderSide(color: theme.listSectionBorder, width: 1.0),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -148,19 +248,19 @@ class _SectionHeader extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1E293B),
+                color: theme.navyText,
               ),
             ),
           ),
           GestureDetector(
             onTap: onAdd,
-            child: const Text(
+            child: Text(
               'Add Item',
               style: TextStyle(
-                color: Color(0xFF0071CE),
+                color: context.brandBlue,
                 fontWeight: FontWeight.bold,
                 fontSize: 15,
               ),
@@ -185,10 +285,13 @@ class _ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.appTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       children: [
         Container(
-          color: Colors.white,
+          color: theme.cardSurface,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,7 +315,9 @@ class _ItemRow extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: item.checked ? Colors.black38 : Colors.black,
+                        color: item.checked
+                            ? colorScheme.onSurface.withValues(alpha: 0.38)
+                            : colorScheme.onSurface,
                         decoration: item.checked
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
@@ -238,17 +343,17 @@ class _ItemRow extends StatelessWidget {
                             children: [
                               TextSpan(
                                 text: '${item.salePrefix!} ',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: Colors.black,
+                                  color: colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               TextSpan(
                                 text: item.priceText!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 15,
-                                  color: Colors.black,
+                                  color: colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -260,7 +365,7 @@ class _ItemRow extends StatelessWidget {
                           item.priceText!,
                           style: TextStyle(
                             fontSize: 15,
-                            color: item.priceColor,
+                            color: colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -269,9 +374,9 @@ class _ItemRow extends StatelessWidget {
                       const SizedBox(height: 1),
                       Text(
                         item.subtitle!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.black54,
+                          color: theme.subtitle,
                         ),
                       ),
                     ],
@@ -286,7 +391,7 @@ class _ItemRow extends StatelessWidget {
             ],
           ),
         ),
-        const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
+        Divider(height: 1, color: theme.border, thickness: 1),
       ],
     );
   }
@@ -300,18 +405,20 @@ class _CustomCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.appTheme;
+
     return GestureDetector(
       onTap: () => onChanged(!value),
       child: Container(
         width: 22,
         height: 22,
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: const Color(0xFF8C96A3), width: 1.2),
+          color: theme.cardSurface,
+          border: Border.all(color: theme.chipInactive, width: 1.2),
           borderRadius: BorderRadius.circular(2),
         ),
         child: value
-            ? const Icon(Icons.check, size: 16, color: Color(0xFF0071CE))
+            ? Icon(Icons.check, size: 16, color: context.brandBlue)
             : null,
       ),
     );
@@ -326,31 +433,34 @@ class _QtyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.appTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return InkWell(
       onTap: () => _showQtyPicker(context),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F7FA),
-          border: Border.all(color: const Color(0xFFD2D6DC)),
+          color: theme.sectionBg,
+          border: Border.all(color: theme.border),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Text.rich(
           TextSpan(
             children: [
-              const TextSpan(
+              TextSpan(
                 text: 'Qty.',
                 style: TextStyle(
                   fontSize: 13,
-                  color: Colors.black87,
+                  color: theme.subtitle,
                   fontWeight: FontWeight.normal,
                 ),
               ),
               TextSpan(
                 text: '$qty',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: Colors.black,
+                  color: colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -362,16 +472,19 @@ class _QtyButton extends StatelessWidget {
   }
 
   void _showQtyPicker(BuildContext context) async {
+    final theme = context.appTheme;
+
     final selected = await showModalBottomSheet<int>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: context.appTheme.cardSurface,
       builder: (_) => SafeArea(
         top: false,
         child: SizedBox(
           height: 280,
           child: ListView.separated(
             itemCount: 20,
-            separatorBuilder: (context, index) => const Divider(height: 1),
+            separatorBuilder: (context, index) =>
+                Divider(height: 1, color: theme.border),
             itemBuilder: (_, i) => ListTile(
               title: Text('Qty.${i + 1}'),
               onTap: () => Navigator.of(context).pop(i + 1),

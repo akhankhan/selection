@@ -6,6 +6,7 @@ import '../models/flyer_item.dart';
 import '../models/store.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
+import '../../../core/theme/app_theme_extension.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
 
@@ -252,13 +253,23 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
 
       final String renderUrl = _renderUrlForPage(page);
       // Add to shopping list
-      manager.addFlyerItem(tapped, store.name, _flyerImages.value[renderUrl]);
+      manager.addFlyerItem(
+        tapped,
+        store.name,
+        _flyerImages.value[renderUrl],
+        storeDateRange: store.dateRange,
+      );
 
       _showItemBottomSheet(tapped, renderUrl);
     } else if (existing.status == AnimationStatus.reverse) {
       final String renderUrl = _renderUrlForPage(page);
       existing.forward();
-      manager.addFlyerItem(tapped, store.name, _flyerImages.value[renderUrl]);
+      manager.addFlyerItem(
+        tapped,
+        store.name,
+        _flyerImages.value[renderUrl],
+        storeDateRange: store.dateRange,
+      );
       _showItemBottomSheet(tapped, renderUrl);
     } else {
       existing.reverse();
@@ -536,16 +547,21 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final int storeCount = _stores.length;
     if (storeCount <= 1) return const SizedBox.shrink();
 
+    final appTheme = context.appTheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: appTheme.cardSurface,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        border: context.isDarkMode
+            ? Border.all(color: appTheme.border.withValues(alpha: 0.6))
+            : null,
+        boxShadow: [
           BoxShadow(
-            color: Color(0x1F000000),
+            color: Colors.black.withValues(alpha: context.isDarkMode ? 0.45 : 0.12),
             blurRadius: 10,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -591,21 +607,26 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   Widget build(BuildContext context) {
     final Store store = _activeStore;
     final int listCount = ShoppingListManager().totalItemCount;
+    final appTheme = context.appTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final appBarTheme = Theme.of(context).appBarTheme;
+    final iconColor = appBarTheme.foregroundColor ?? colorScheme.onSurface;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: appBarTheme.backgroundColor,
+        foregroundColor: appBarTheme.foregroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
         toolbarHeight: 52,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: iconColor),
           onPressed: () => Navigator.maybePop(context),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.share_outlined, color: Colors.black54),
+            icon: Icon(Icons.share_outlined, color: iconColor.withValues(alpha: 0.7)),
             onPressed: null,
           ),
           if (listCount > 0)
@@ -614,9 +635,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
               backgroundColor: Colors.red,
               offset: const Offset(-4, 4),
               child: IconButton(
-                icon: const Icon(
+                icon: Icon(
                   Icons.calendar_today_outlined,
-                  color: Colors.black54,
+                  color: iconColor.withValues(alpha: 0.7),
                 ),
                 onPressed: () {
                   Navigator.of(context).push(
@@ -627,9 +648,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             )
           else
             IconButton(
-              icon: const Icon(
+              icon: Icon(
                 Icons.calendar_today_outlined,
-                color: Colors.black54,
+                color: iconColor.withValues(alpha: 0.7),
               ),
               onPressed: () {
                 Navigator.of(
@@ -642,7 +663,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             onPressed: null,
           ),
           IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.black54),
+            icon: Icon(Icons.more_vert, color: iconColor.withValues(alpha: 0.7)),
             onPressed: null,
           ),
         ],
@@ -670,15 +691,15 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
                   children: [
                     Text(
                       store.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: Colors.black,
+                        color: appTheme.navyText,
                       ),
                     ),
                     Text(
                       store.dateRange,
-                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                      style: TextStyle(fontSize: 13, color: appTheme.subtitle),
                     ),
                   ],
                 ),

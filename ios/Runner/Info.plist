@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Selection</string>
+	<string>MENU2GO Express</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,6 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Allow access to your photo library to choose a profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow camera access to take a profile picture.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -53,7 +57,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<!-- Reversed client ID from GoogleService-Info.plist -->
-				<string>com.googleusercontent.apps.699002286605-6oa40u9chkn6qgggn2k8pc6tb79di8vq</string>
+				<string>com.googleusercontent.apps.699002286605-s0e1h3f305up89jadki6ae85bnle8o25</string>
 			</array>
 		</dict>
 	</array>

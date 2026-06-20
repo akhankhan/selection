@@ -1,6 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../core/theme/app_theme_extension.dart';
 import '../../flyer/data/flyer_repository.dart';
+import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
 import '../../flyer/screens/flyer_viewer_screen.dart';
 import '../../lists/screens/lists_screen.dart';
@@ -9,6 +12,7 @@ import '../../settings/screens/help_support_screen.dart';
 import '../../settings/screens/my_cards_screen.dart';
 import '../../settings/screens/request_store_screen.dart';
 import '../widgets/store_card.dart';
+import '../widgets/search_tab_view.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key});
@@ -18,8 +22,6 @@ class BrowseScreen extends StatefulWidget {
 }
 
 class _BrowseScreenState extends State<BrowseScreen> {
-  static const Color _brandBlue = Color(0xFF0071CE);
-
   static const List<String> _categories = [
     'Favorites',
     'Explore',
@@ -41,6 +43,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   int _bottomNavIndex = 0;
   String _currentLocation = 'A1A 1A1';
   final Set<String> _favoritedStoreIds = {};
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
 
   late PageController _pageController;
   final ScrollController _tabsScrollController = ScrollController();
@@ -57,14 +61,22 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.initState();
     _pageController = PageController(initialPage: _selectedCategory.value);
     _pageController.addListener(_onPageScroll);
+    _searchController.addListener(_onSearchTextChanged);
+  }
+
+  void _onSearchTextChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     _pageController.removeListener(_onPageScroll);
+    _searchController.removeListener(_onSearchTextChanged);
     _pageController.dispose();
     _tabsScrollController.dispose();
     _selectedCategory.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -250,19 +262,34 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
+  void _activateSearch() {
+    setState(() => _bottomNavIndex = 1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+  }
+
+  void _openDealFromSearch(List<Store> stores, Store store, FlyerItem item) {
+    final storeIndex = stores.indexWhere((s) => s.id == store.id);
+    if (storeIndex < 0) return;
+    _openStore(stores, storeIndex);
+  }
+
   void _showChangeLocationDialog() {
     final controller = TextEditingController(text: _currentLocation);
+    final appTheme = context.appTheme;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: appTheme.cardSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             left: 24,
             right: 24,
             top: 24,
@@ -276,24 +303,24 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: appTheme.subtitle.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Change Location',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: appTheme.navyText,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Enter a postal code to see flyers and deals in that area.',
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                style: TextStyle(fontSize: 14, color: appTheme.subtitle),
               ),
               const SizedBox(height: 20),
               TextField(
@@ -302,9 +329,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   hintText: 'e.g. M5V 2H1 or K1A 0B1',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  hintStyle: TextStyle(
+                    color: appTheme.subtitle.withValues(alpha: 0.6),
+                  ),
                   filled: true,
-                  fillColor: const Color(0xFFF1F5F9),
+                  fillColor: appTheme.searchFill,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
@@ -321,19 +350,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
                       setState(() {
                         _currentLocation = newLoc.toUpperCase();
                       });
-                      Navigator.pop(context);
+                      Navigator.pop(sheetContext);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
                             'Location updated to $_currentLocation!',
                           ),
-                          backgroundColor: _brandBlue,
+                          backgroundColor: context.brandBlue,
                         ),
                       );
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _brandBlue,
+                    backgroundColor: context.brandBlue,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -359,12 +388,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(
-        0xFFF4F5F7,
-      ), // Match the subtle background in screenshot
-      appBar: _buildAppBar(),
-      body: SafeArea(
+    final appBarTheme = Theme.of(context).appBarTheme;
+    final systemOverlay =
+        appBarTheme.systemOverlayStyle ??
+        (context.isDarkMode
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark);
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: systemOverlay,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: _buildAppBar(),
+        body: SafeArea(
         top: false,
         child: StreamBuilder<List<Store>>(
           stream: FlyerRepository.instance.watchStores(),
@@ -376,23 +412,36 @@ class _BrowseScreenState extends State<BrowseScreen> {
               return Column(
                 children: [
                   Container(
-                    color: Colors.white,
+                    color: context.appTheme.headerSurface,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _buildSearchBar(),
                         _buildCategoryTabs(),
-                        const Divider(height: 1, color: Color(0xFFEEEEEE)),
+                        Divider(height: 1, color: Theme.of(context).dividerColor),
                       ],
                     ),
                   ),
-                  const Expanded(
-                    child: Center(child: CircularProgressIndicator()),
+                  Expanded(
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: context.brandBlue,
+                      ),
+                    ),
                   ),
                 ],
               );
             }
             final stores = snap.data!;
+            if (_bottomNavIndex == 1) {
+              return SearchTabView(
+                stores: stores,
+                searchController: _searchController,
+                searchFocusNode: _searchFocusNode,
+                onOpenStore: _openStore,
+                onOpenDeal: _openDealFromSearch,
+              );
+            }
             return Stack(
               children: [
                 // 1. Scrollable PageView content (rendered underneath)
@@ -440,27 +489,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   top: 0,
                   left: 0,
                   right: 0,
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
-                      child: Container(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        child: RepaintBoundary(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildSearchBar(),
-                              _buildCategoryTabs(),
-                              const Divider(
-                                height: 1,
-                                color: Color(0xFFEEEEEE),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _buildFloatingHeader(),
                 ),
               ],
             );
@@ -468,14 +497,50 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ),
       ),
       bottomNavigationBar: _buildBottomNav(),
+      ),
+    );
+  }
+
+  Widget _buildFloatingHeader() {
+    final appTheme = context.appTheme;
+    final header = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildSearchBar(),
+        _buildCategoryTabs(),
+        Divider(height: 1, color: Theme.of(context).dividerColor),
+      ],
+    );
+
+    if (context.isDarkMode) {
+      return Container(
+        color: appTheme.headerSurface,
+        child: header,
+      );
+    }
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
+        child: Container(
+          color: appTheme.headerSurface.withValues(alpha: 0.92),
+          child: RepaintBoundary(child: header),
+        ),
+      ),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final appTheme = context.appTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final appBarTheme = Theme.of(context).appBarTheme;
+
     return AppBar(
-      backgroundColor: Colors.white,
+      backgroundColor: appBarTheme.backgroundColor,
+      foregroundColor: appBarTheme.foregroundColor,
       elevation: 0,
       scrolledUnderElevation: 0,
+      systemOverlayStyle: appBarTheme.systemOverlayStyle,
       toolbarHeight: 60,
       titleSpacing: 16,
       title: InkWell(
@@ -488,11 +553,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
             children: [
               CircleAvatar(
                 radius: 16,
-                backgroundColor: _brandBlue.withValues(alpha: 0.1),
-                child: const Icon(
+                backgroundColor: context.brandBlue.withValues(alpha: 0.1),
+                child: Icon(
                   Icons.local_offer_outlined,
                   size: 18,
-                  color: _brandBlue,
+                  color: context.brandBlue,
                 ),
               ),
               const SizedBox(width: 10),
@@ -502,14 +567,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 children: [
                   Text(
                     'Savings from:',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 12, color: appTheme.subtitle),
                   ),
                   Text(
                     _currentLocation,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: _brandBlue,
+                      color: context.brandBlue,
                     ),
                   ),
                 ],
@@ -520,24 +585,17 @@ class _BrowseScreenState extends State<BrowseScreen> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.search, color: Colors.black54, size: 26),
-          onPressed: () {
-            setState(() {
-              _bottomNavIndex = 1;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Search tab activated!')),
-            );
-          },
+          icon: Icon(Icons.search, color: colorScheme.onSurface, size: 26),
+          onPressed: _activateSearch,
         ),
         PopupMenuButton<String>(
-          icon: const Icon(
+          icon: Icon(
             Icons.settings_outlined,
-            color: Colors.black54,
+            color: colorScheme.onSurface,
             size: 26,
           ),
-          color: Colors.white,
-          surfaceTintColor: Colors.white,
+          color: appTheme.cardSurface,
+          surfaceTintColor: Colors.transparent,
           elevation: 6,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -571,76 +629,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
             }
           },
           itemBuilder: (context) => [
-            const PopupMenuItem<String>(
-              value: 'settings',
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                child: Text(
-                  'Settings',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'location',
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                child: Text(
-                  'Change Location',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'help',
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                child: Text(
-                  'Help & Support',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'cards',
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                child: Text(
-                  'My Cards',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'request',
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                child: Text(
-                  'Request a Store',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w400,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
+            _popupItem('settings', 'Settings'),
+            _popupItem('location', 'Change Location'),
+            _popupItem('help', 'Help & Support'),
+            _popupItem('cards', 'My Cards'),
+            _popupItem('request', 'Request a Store'),
           ],
         ),
         const SizedBox(width: 4),
@@ -648,34 +641,73 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
+  PopupMenuItem<String> _popupItem(String value, String label) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w400,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSearchBar() {
+    final appTheme = context.appTheme;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-      child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF2F3F5),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _activateSearch,
           borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.search, color: Colors.grey[700], size: 22),
-            const SizedBox(width: 8),
-            Text(
-              'Search deals and stores',
-              style: TextStyle(color: Colors.grey[700], fontSize: 14),
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: appTheme.searchFill,
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
+            child: Row(
+              children: [
+                Icon(Icons.search, color: appTheme.subtitle, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _searchController.text.isEmpty
+                        ? 'Search deals and stores'
+                        : _searchController.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _searchController.text.isEmpty
+                          ? appTheme.subtitle
+                          : appTheme.navyText,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildCategoryTabs() {
+    final appTheme = context.appTheme;
+
     return Container(
       height: 44,
-      color: Colors.white,
+      color: appTheme.headerSurface,
       child: Row(
         children: [
           // 1. Pinned Favorites Tab
@@ -704,7 +736,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                             Icons.favorite,
                             color: isFavoriteActive
                                 ? Colors.red
-                                : const Color(0xFF5F6368),
+                                : appTheme.chipInactive,
                             size: 22,
                           ),
                         ),
@@ -730,7 +762,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
           Container(
             width: 1,
             height: 20,
-            color: const Color(0xFFDDDDDD),
+            color: appTheme.border,
           ),
 
           // 3. Scrollable List of Categories (with horizontal expandable lines)
@@ -765,8 +797,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
                                   duration: const Duration(milliseconds: 250),
                                   style: TextStyle(
                                     color: active
-                                        ? _brandBlue
-                                        : const Color(0xFF5F6368),
+                                        ? context.brandBlue
+                                        : appTheme.chipInactive,
                                     fontWeight: active
                                         ? FontWeight.w800
                                         : FontWeight.w600,
@@ -782,7 +814,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                               height: 3,
                               width: active ? 28.0 : 0.0,
                               decoration: BoxDecoration(
-                                color: _brandBlue,
+                                color: context.brandBlue,
                                 borderRadius: BorderRadius.circular(1.5),
                               ),
                             ),
@@ -801,6 +833,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildEmptyFavorites() {
+    final appTheme = context.appTheme;
+
     return Padding(
       padding: const EdgeInsets.only(top: 103.0),
       child: Center(
@@ -809,14 +843,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
+              Icon(Icons.favorite_border, size: 64, color: appTheme.subtitle),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'No Favorites Yet',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: appTheme.navyText,
                 ),
               ),
               const SizedBox(height: 8),
@@ -825,7 +859,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: appTheme.subtitle,
                   height: 1.35,
                 ),
               ),
@@ -998,10 +1032,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
-              color: Color(0xFF1E293B),
+              color: context.appTheme.navyText,
             ),
           ),
           if (label == 'Your Favorites')
@@ -1011,10 +1045,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   const SnackBar(content: Text('Edit Favorites tapped!')),
                 );
               },
-              child: const Text(
+              child: Text(
                 'EDIT',
                 style: TextStyle(
-                  color: _brandBlue,
+                  color: context.brandBlue,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                   letterSpacing: 0.5,
@@ -1032,17 +1066,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
       padding: const EdgeInsets.symmetric(vertical: 20),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: context.appTheme.sectionBg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         message,
-        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+        style: TextStyle(color: context.appTheme.subtitle, fontSize: 13),
       ),
     );
   }
 
   Widget _buildEmptyCategory(String categoryName) {
+    final appTheme = context.appTheme;
+
     return Padding(
       padding: const EdgeInsets.only(top: 103.0),
       child: Center(
@@ -1051,15 +1087,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.storefront_outlined, size: 64, color: Colors.grey[400]),
+              Icon(Icons.storefront_outlined, size: 64, color: appTheme.subtitle),
               const SizedBox(height: 16),
               Text(
                 'No $categoryName flyers found',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+                  color: appTheme.navyText,
                 ),
               ),
               const SizedBox(height: 8),
@@ -1068,7 +1104,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: appTheme.subtitle,
                   height: 1.35,
                 ),
               ),
@@ -1080,6 +1116,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildErrorState(String message) {
+    final appTheme = context.appTheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -1091,7 +1129,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              style: TextStyle(fontSize: 14, color: appTheme.subtitle),
             ),
           ],
         ),
@@ -1100,23 +1138,43 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      currentIndex: _bottomNavIndex,
-      onTap: (i) {
-        if (i == 2) {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute(builder: (_) => const ListsScreen()));
-        } else {
-          setState(() => _bottomNavIndex = i);
-        }
-      },
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.white,
-      selectedItemColor: _brandBlue,
-      unselectedItemColor: Colors.grey[600],
-      selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-      items: const [
+    final navTheme = Theme.of(context).bottomNavigationBarTheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: navTheme.backgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 1,
+          ),
+        ),
+      ),
+      child: BottomNavigationBar(
+        currentIndex: _bottomNavIndex,
+        onTap: (i) {
+          if (i == 2) {
+            Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ListsScreen()));
+          } else {
+            setState(() => _bottomNavIndex = i);
+            if (i == 1) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _searchFocusNode.requestFocus();
+              });
+            } else {
+              _searchFocusNode.unfocus();
+            }
+          }
+        },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: navTheme.backgroundColor,
+        selectedItemColor: navTheme.selectedItemColor,
+        unselectedItemColor: navTheme.unselectedItemColor,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+        elevation: 0,
+        items: const [
         BottomNavigationBarItem(
           icon: Icon(Icons.local_offer_outlined),
           activeIcon: Icon(Icons.local_offer),
@@ -1129,6 +1187,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
           label: 'Lists',
         ),
       ],
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme_extension.dart';
 import '../models/flyer_item.dart';
 import 'product_thumbnail.dart';
 
@@ -30,9 +31,7 @@ class DealSheet extends StatefulWidget {
 }
 
 class _DealSheetState extends State<DealSheet> {
-  static const Color _ink = Color(0xFF1A1A1A);
   static const Color _brandBlue = Color(0xFF0071CE);
-  static const Color _grey = Color(0xFF7A7A7A);
   static const double _expandedSize = 0.82;
 
   double get _collapsedSize {
@@ -95,6 +94,8 @@ class _DealSheetState extends State<DealSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.appTheme;
+
     return DraggableScrollableSheet(
       controller: _controller,
       initialChildSize: widget.startExpanded ? _expandedSize : _collapsedSize,
@@ -105,10 +106,15 @@ class _DealSheetState extends State<DealSheet> {
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [BoxShadow(blurRadius: 24, color: Colors.black26)],
+          decoration: BoxDecoration(
+            color: appTheme.cardSurface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 24,
+                color: Colors.black.withValues(alpha: context.isDarkMode ? 0.55 : 0.15),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -141,6 +147,8 @@ class _DealSheetState extends State<DealSheet> {
   }
 
   Widget _buildHandle() {
+    final subtitle = context.appTheme.subtitle;
+
     return GestureDetector(
       onTap: _toggle,
       behavior: HitTestBehavior.opaque,
@@ -150,10 +158,10 @@ class _DealSheetState extends State<DealSheet> {
           child: AnimatedRotation(
             turns: _expanded ? 0.5 : 0.0,
             duration: const Duration(milliseconds: 250),
-            child: const Icon(
+            child: Icon(
               Icons.keyboard_arrow_up,
               size: 24,
-              color: Color(0xFF5F6368),
+              color: subtitle,
             ),
           ),
         ),
@@ -164,6 +172,8 @@ class _DealSheetState extends State<DealSheet> {
   /// Compact peek: photo on the left, name + price on the right.
   Widget _buildCompact() {
     final FlyerItem item = widget.item;
+    final textColor = context.appTheme.navyText;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
       child: Row(
@@ -185,20 +195,20 @@ class _DealSheetState extends State<DealSheet> {
               children: [
                 Text(
                   item.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: _ink,
+                    color: textColor,
                     height: 1.15,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   item.price,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: _ink,
+                    color: textColor,
                   ),
                 ),
               ],
@@ -212,6 +222,10 @@ class _DealSheetState extends State<DealSheet> {
   /// Full detail view shown when the sheet is expanded.
   Widget _buildExpanded() {
     final FlyerItem item = widget.item;
+    final appTheme = context.appTheme;
+    final textColor = appTheme.navyText;
+    final subtitleColor = appTheme.subtitle;
+    final dividerColor = Theme.of(context).dividerColor;
     // Demo detail content matching the screenshot structure:
     final String sku = item.id.hashCode
         .abs()
@@ -244,19 +258,19 @@ class _DealSheetState extends State<DealSheet> {
             children: [
               Text(
                 item.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 20,
-                  color: _ink,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 item.price,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 24,
-                  color: _ink,
+                  color: textColor,
                 ),
               ),
               const SizedBox(height: 12),
@@ -280,11 +294,11 @@ class _DealSheetState extends State<DealSheet> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text.rich(
                       TextSpan(
-                        style: TextStyle(fontSize: 14, color: _ink),
-                        children: [
+                        style: TextStyle(fontSize: 14, color: textColor),
+                        children: const [
                           TextSpan(text: 'Sold and fulfilled by '),
                           TextSpan(
                             text: 'Walmart',
@@ -297,9 +311,9 @@ class _DealSheetState extends State<DealSheet> {
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'Valid from May 21, 2026 to May 28, 2026',
-                style: TextStyle(fontSize: 13, color: _grey),
+                style: TextStyle(fontSize: 13, color: subtitleColor),
               ),
               const SizedBox(height: 12),
             ],
@@ -307,20 +321,20 @@ class _DealSheetState extends State<DealSheet> {
         ),
         _sectionHeader('Description'),
         _bodyText('Pack. Product of USA or Mexico.\n#$productCode.'),
-        const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
+        Divider(height: 1, color: dividerColor, thickness: 1),
         _bodyText('SKU: $sku'),
         const SizedBox(height: 10),
         _sectionHeader('Terms and conditions'),
         _linkRow('Shipping policy'),
-        const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
+        Divider(height: 1, color: dividerColor, thickness: 1),
         _linkRow('Return policy'),
-        const Divider(height: 1, color: Color(0xFFEEEEEE), thickness: 1),
-        const Padding(
-          padding: EdgeInsets.fromLTRB(20, 16, 20, 24),
+        Divider(height: 1, color: dividerColor, thickness: 1),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Text(
             'In the event of a disagreement between the flyer and this popup, '
             'the flyers shall take precedence',
-            style: TextStyle(fontSize: 12.5, color: _grey, height: 1.4),
+            style: TextStyle(fontSize: 12.5, color: subtitleColor, height: 1.4),
           ),
         ),
       ],
@@ -328,16 +342,18 @@ class _DealSheetState extends State<DealSheet> {
   }
 
   Widget _sectionHeader(String title) {
+    final appTheme = context.appTheme;
+
     return Container(
       width: double.infinity,
-      color: const Color(0xFFF2F3F5),
+      color: appTheme.sectionBg,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 14,
-          color: _ink,
+          color: appTheme.navyText,
         ),
       ),
     );
@@ -348,7 +364,11 @@ class _DealSheetState extends State<DealSheet> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 14, color: _ink, height: 1.4),
+        style: TextStyle(
+          fontSize: 14,
+          color: context.appTheme.navyText,
+          height: 1.4,
+        ),
       ),
     );
   }
@@ -372,10 +392,12 @@ class _DealSheetState extends State<DealSheet> {
   }
 
   Widget _buildButtons(BuildContext context) {
+    final appTheme = context.appTheme;
+
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+      decoration: BoxDecoration(
+        color: appTheme.cardSurface,
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       padding: EdgeInsets.fromLTRB(
         16,

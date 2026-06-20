@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/widgets/product_thumbnail.dart';
+import '../utils/flyer_date_parser.dart';
 import '../widgets/mock_thumbnails.dart';
 import 'list_item.dart';
 
@@ -24,6 +25,22 @@ class ShoppingListManager extends ChangeNotifier {
     return count;
   }
 
+  int get checkedCount {
+    int count = 0;
+    for (final section in _sections) {
+      count += section.items.where((item) => item.checked).length;
+    }
+    return count;
+  }
+
+  int get expiredCount {
+    int count = 0;
+    for (final section in _sections) {
+      count += section.items.where((item) => isFlyerExpired(item.expiresAt)).length;
+    }
+    return count;
+  }
+
   // Checks if a flyer item exists in the list
   bool hasFlyerItem(String flyerItemId, String storeName) {
     final section = _findSection(storeName);
@@ -32,7 +49,12 @@ class ShoppingListManager extends ChangeNotifier {
   }
 
   // Adds an item selected from the flyer
-  void addFlyerItem(FlyerItem item, String storeName, ui.Image? flyerImage) {
+  void addFlyerItem(
+    FlyerItem item,
+    String storeName,
+    ui.Image? flyerImage, {
+    String? storeDateRange,
+  }) {
     // 1. Find or create the section
     var section = _findSection(storeName);
     if (section == null) {
@@ -90,6 +112,7 @@ class ShoppingListManager extends ChangeNotifier {
       priceText: item.price,
       subtitle: item.isRollback ? 'Rollback' : 'Special Deal',
       flyerItemId: item.id,
+      expiresAt: parseFlyerExpiryDate(storeDateRange ?? ''),
     );
 
     section.items.add(listItem);
@@ -138,26 +161,41 @@ class ShoppingListManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Deletes all checked items
-  void deleteChecked() {
+  int deleteChecked() {
+    int removed = 0;
     for (final section in _sections) {
+      final before = section.items.length;
       section.items.removeWhere((item) => item.checked);
+      removed += before - section.items.length;
     }
-    // Clean up empty store sections (except My List)
     _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
 
     notifyListeners();
+    return removed;
   }
 
-  // Deletes all items
-  void deleteAll() {
+  int deleteExpired() {
+    int removed = 0;
+    for (final section in _sections) {
+      final before = section.items.length;
+      section.items.removeWhere((item) => isFlyerExpired(item.expiresAt));
+      removed += before - section.items.length;
+    }
+    _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
+
+    notifyListeners();
+    return removed;
+  }
+
+  int deleteAll() {
+    int removed = totalItemCount;
     for (final section in _sections) {
       section.items.clear();
     }
-    // Clean up all empty store sections (except My List)
     _sections.removeWhere((s) => s.items.isEmpty && s.title != 'My List');
 
     notifyListeners();
+    return removed;
   }
 
   ListSection? _findSection(String title) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme_extension.dart';
+
 class RequestStoreScreen extends StatefulWidget {
   const RequestStoreScreen({super.key});
 
@@ -34,12 +36,14 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogContext) {
+        final appTheme = dialogContext.appTheme;
+
         return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          backgroundColor: Colors.white,
+          backgroundColor: appTheme.cardSurface,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: Column(
@@ -64,13 +68,13 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                   'Request Submitted!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: appTheme.navyText,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -79,7 +83,7 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: appTheme.subtitle,
                     height: 1.45,
                   ),
                 ),
@@ -126,27 +130,24 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.appTheme;
+    final appBarTheme = Theme.of(context).appBarTheme;
+    final isDark = context.isDarkMode;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: appBarTheme.backgroundColor,
+        foregroundColor: appBarTheme.foregroundColor,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'Request a Store',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: Theme.of(context).dividerColor),
         ),
       ),
       body: SingleChildScrollView(
@@ -160,15 +161,21 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0F7FF),
+                  color: isDark
+                      ? _brandBlue.withValues(alpha: 0.12)
+                      : const Color(0xFFF0F7FF),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFC2E0FF)),
+                  border: Border.all(
+                    color: isDark
+                        ? _brandBlue.withValues(alpha: 0.35)
+                        : const Color(0xFFC2E0FF),
+                  ),
                 ),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.storefront, color: _brandBlue, size: 24),
-                    SizedBox(width: 12),
+                    const Icon(Icons.storefront, color: _brandBlue, size: 24),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,15 +185,19 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
-                              color: Color(0xFF003893),
+                              color: isDark
+                                  ? appTheme.navyText
+                                  : const Color(0xFF003893),
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'Let us know which local retailer flyers you\'d like to see, and we\'ll do our best to onboard them!',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Color(0xFF004CB3),
+                              color: isDark
+                                  ? appTheme.subtitle
+                                  : const Color(0xFF004CB3),
                               height: 1.35,
                             ),
                           ),
@@ -199,12 +210,12 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
               const SizedBox(height: 28),
 
               // Store Name
-              const Text(
+              Text(
                 'Store Name *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF1E293B),
+                  color: appTheme.navyText,
                 ),
               ),
               const SizedBox(height: 8),
@@ -216,38 +227,22 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                   }
                   return null;
                 },
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: 'e.g. Sobeys, No Frills, FreshCo',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _brandBlue, width: 1.5),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Location (City & Province/Postal)
-              const Text(
+              Text(
                 'Store Location / City *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF1E293B),
+                  color: appTheme.navyText,
                 ),
               ),
               const SizedBox(height: 8),
@@ -259,63 +254,32 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                   }
                   return null;
                 },
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: 'e.g. Toronto, ON or Vancouver, BC',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  contentPadding: const EdgeInsets.symmetric(
+                  contentPadding: EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 14,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _brandBlue, width: 1.5),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Why do you want this store? (Comments)
-              const Text(
+              Text(
                 'Any additional comments? (Optional)',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
-                  color: Color(0xFF1E293B),
+                  color: appTheme.navyText,
                 ),
               ),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _commentsController,
                 maxLines: 4,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText:
                       'Tell us why you love this store or which items you shop for...',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  contentPadding: const EdgeInsets.all(16),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _brandBlue, width: 1.5),
-                  ),
+                  contentPadding: EdgeInsets.all(16),
                 ),
               ),
               const SizedBox(height: 36),

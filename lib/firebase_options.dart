@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCYFjROdK7QgXZL2TPmpFRhvNyJI197RTk',
-    appId: '1:699002286605:android:a7ad79df8f0f5ee559db44',
+    appId: '1:699002286605:android:d2a585ee99dcc76759db44',
     messagingSenderId: '699002286605',
     projectId: 'selection-admin',
     storageBucket: 'selection-admin.firebasestorage.app',
@@ -59,13 +59,13 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBgAzuMGyLMDVs-yc6Z6ATecOmx4_B9uNw',
-    appId: '1:699002286605:ios:b0403673cee7406d59db44',
+    appId: '1:699002286605:ios:6384f268cd736f9059db44',
     messagingSenderId: '699002286605',
     projectId: 'selection-admin',
     storageBucket: 'selection-admin.firebasestorage.app',
     androidClientId: '699002286605-9ms8hsbev6mfbd5ss724rmai84bk4ikn.apps.googleusercontent.com',
-    iosClientId: '699002286605-6oa40u9chkn6qgggn2k8pc6tb79di8vq.apps.googleusercontent.com',
-    iosBundleId: 'com.example.selection',
+    iosClientId: '699002286605-s0e1h3f305up89jadki6ae85bnle8o25.apps.googleusercontent.com',
+    iosBundleId: 'com.menu2go.expressapp',
   );
 
 }

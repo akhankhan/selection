@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_controller.dart';
+import '../../browse/services/search_history_service.dart';
 import 'signin_screen.dart';
+import 'edit_profile_screen.dart';
 import 'privacy_choices_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,42 +16,47 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  static const Color _brandBlue = Color(0xFF0071CE);
+  static const Color _brandBlue = AppTheme.brandBlue;
 
   bool _acceptNotifications = true;
-  String _selectedTheme = 'System';
   String _autoDeleteOption = 'Never (Default)';
 
   void _showThemePicker() {
+    final currentTheme = ThemeController.instance.label;
+
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: Colors.white,
           title: const Text(
             'Select Theme',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           content: RadioGroup<String>(
-            groupValue: _selectedTheme,
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedTheme = value);
-                Navigator.pop(context);
+            groupValue: currentTheme,
+            onChanged: (value) async {
+              if (value == null) return;
+              await ThemeController.instance.setPreference(
+                AppThemePreference.fromLabel(value),
+              );
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
               }
             },
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              children: ['System', 'Light', 'Dark'].map((theme) {
+              children: AppThemePreference.values.map((theme) {
                 return ListTile(
-                  title: Text(theme),
+                  title: Text(theme.label),
                   leading: Radio<String>(
-                    value: theme,
+                    value: theme.label,
                     activeColor: _brandBlue,
                   ),
-                  onTap: () {
-                    setState(() => _selectedTheme = theme);
-                    Navigator.pop(context);
+                  onTap: () async {
+                    await ThemeController.instance.setPreference(theme);
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                    }
                   },
                 );
               }).toList(),
@@ -63,7 +72,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.white,
           title: const Text(
             'Auto Delete Expired Items',
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -100,12 +108,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _confirmClear(String title, String message) {
+  void _confirmClear(String title, String message, {Future<void> Function()? onConfirm}) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: Colors.white,
           title: Text(
             title,
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -114,11 +121,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: 0.6,
+                  ),
+                ),
+              ),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(context);
+                await onConfirm?.call();
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('$title Cleared Successfully!'),
@@ -144,18 +160,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black87),
+              icon: Icon(
+                Icons.arrow_back,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
               title,
-              style: const TextStyle(
-                color: Colors.black,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
@@ -169,7 +186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: _brandBlue,
@@ -182,9 +199,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. '
                     'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. '
                     'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
-                      color: Colors.black87,
+                      color: Theme.of(context).colorScheme.onSurface,
                       height: 1.5,
                     ),
                   ),
@@ -199,36 +216,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(
-        0xFFF4F5F7,
-      ), // Match the subtle grey background in screenshots
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Settings',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: theme.scaffoldBackgroundColor,
+          appBar: AppBar(
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: colorScheme.onSurface),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              'Settings',
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(height: 1, color: theme.dividerColor),
+            ),
           ),
-        ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFEEEEEE)),
-        ),
-      ),
-      body: ListView(
-        children: [
+          body: ListView(
+            children: [
           // My Account Section
           StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
+            stream: FirebaseAuth.instance.userChanges(),
             builder: (context, snapshot) {
               final user = snapshot.data;
               if (user == null) {
@@ -271,61 +289,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _buildCategoryHeader('My Account'),
                     Material(
-                      color: Colors.white,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24,
-                              backgroundColor: _brandBlue.withValues(
-                                alpha: 0.1,
+                      color: Theme.of(context).colorScheme.surface,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const EditProfileScreen(),
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24,
+                                backgroundColor: _brandBlue.withValues(
+                                  alpha: 0.1,
+                                ),
+                                backgroundImage: user.photoURL != null
+                                    ? NetworkImage(user.photoURL!)
+                                    : null,
+                                child: user.photoURL == null
+                                    ? Text(
+                                        (user.displayName ??
+                                                user.email ??
+                                                'U')[0]
+                                            .toUpperCase(),
+                                        style: const TextStyle(
+                                          color: _brandBlue,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      )
+                                    : null,
                               ),
-                              backgroundImage: user.photoURL != null
-                                  ? NetworkImage(user.photoURL!)
-                                  : null,
-                              child: user.photoURL == null
-                                  ? Text(
-                                      (user.displayName ??
-                                          user.email ??
-                                          'U')[0]
-                                          .toUpperCase(),
-                                      style: const TextStyle(
-                                        color: _brandBlue,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.displayName ?? 'User',
+                                      style: TextStyle(
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 18,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface,
                                       ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    user.displayName ?? 'User',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    user.email ?? '',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey[600],
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      user.email ?? '',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.6),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                              Icon(
+                                Icons.chevron_right,
+                                color: Colors.grey[400],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -370,7 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildDivider(),
           _buildTile(
             title: 'Theme',
-            subtitle: _selectedTheme,
+            subtitle: ThemeController.instance.label,
             onTap: _showThemePicker,
           ),
           _buildDivider(),
@@ -380,6 +416,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _confirmClear(
               'Search History',
               'Are you sure you want to clear your search history?',
+              onConfirm: SearchHistoryService.instance.clear,
             ),
           ),
 
@@ -437,8 +474,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showMockPage('Share your feedback'),
           ),
           const SizedBox(height: 32),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -458,10 +497,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildDivider() {
-    return const Divider(
+    return Divider(
       height: 1,
       thickness: 1,
-      color: Color(0xFFEEEEEE),
+      color: Theme.of(context).dividerColor,
       indent: 16,
     );
   }
@@ -472,8 +511,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     VoidCallback? onTap,
     bool enabled = true,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
-      color: Colors.white,
+      color: colorScheme.surface,
       child: InkWell(
         onTap: enabled ? onTap : null,
         child: Container(
@@ -486,7 +527,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title,
                 style: TextStyle(
                   fontSize: 16,
-                  color: enabled ? Colors.black87 : Colors.black54,
+                  color: enabled
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurface.withValues(alpha: 0.6),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -494,7 +537,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
             ],
@@ -510,8 +556,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Material(
-      color: Colors.white,
+      color: colorScheme.surface,
       child: InkWell(
         onTap: () => onChanged(!value),
         child: Container(
@@ -525,9 +573,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
-                        color: Colors.black87,
+                        color: colorScheme.onSurface,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -536,7 +584,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey[600],
+                        color: colorScheme.onSurface.withValues(alpha: 0.6),
                         height: 1.25,
                       ),
                     ),
@@ -544,7 +592,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Blue check box to match user's screenshot
               Checkbox(
                 value: value,
                 onChanged: (val) {
@@ -555,7 +602,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(3),
                 ),
-                side: BorderSide(color: Colors.grey[400]!, width: 1.5),
+                side: BorderSide(
+                  color: colorScheme.outline.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
               ),
             ],
           ),

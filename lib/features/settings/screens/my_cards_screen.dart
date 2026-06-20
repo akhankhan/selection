@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme_extension.dart';
+
 class MyCardsScreen extends StatefulWidget {
   const MyCardsScreen({super.key});
 
@@ -72,9 +74,11 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
   ];
 
   void _showCardBarcode(Map<String, dynamic> card) {
+    final appTheme = context.appTheme;
+
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: appTheme.cardSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -89,25 +93,25 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: appTheme.subtitle.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   card['merchant'],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E293B),
+                    color: appTheme.navyText,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   card['cardNumber'],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
-                    color: Colors.black87,
+                    color: appTheme.subtitle,
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -119,8 +123,10 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey[200]!),
+                    color: context.isDarkMode
+                        ? appTheme.sectionBg
+                        : Colors.white,
+                    border: Border.all(color: appTheme.border),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -136,7 +142,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontFamily: 'monospace',
-                          color: Colors.grey[700],
+                          color: appTheme.subtitle,
                           letterSpacing: 3,
                         ),
                       ),
@@ -147,7 +153,7 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                 Text(
                   'Scan this barcode at the store checkout counter.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  style: TextStyle(fontSize: 13, color: appTheme.subtitle),
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -186,13 +192,15 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.appTheme.cardSurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final appTheme = context.appTheme;
+
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -210,37 +218,37 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey[300],
+                          color: appTheme.subtitle.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'Add Loyalty Card',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E293B),
+                        color: appTheme.navyText,
                       ),
                     ),
                     const SizedBox(height: 16),
 
-                    // Merchant Dropdown selector
-                    const Text(
+                    Text(
                       'Select Store / Program',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: appTheme.navyText,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: appTheme.searchFill,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: appTheme.border),
                       ),
                       child: DropdownButton<Map<String, dynamic>>(
                         value: selectedMerchant,
@@ -264,7 +272,10 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                Text(merchant['name']),
+                                Text(
+                                  merchant['name'],
+                                  style: TextStyle(color: appTheme.navyText),
+                                ),
                               ],
                             ),
                           );
@@ -280,28 +291,20 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Card Number Field
-                    const Text(
+                    Text(
                       'Card Number',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: appTheme.navyText,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: numberController,
                       keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
+                      decoration: const InputDecoration(
                         hintText: 'Enter loyalty card number',
-                        hintStyle: TextStyle(color: Colors.grey[500]),
-                        filled: true,
-                        fillColor: const Color(0xFFF1F5F9),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -386,19 +389,25 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        final appTheme = context.appTheme;
+
         return AlertDialog(
-          backgroundColor: Colors.white,
-          title: const Text(
+          backgroundColor: appTheme.cardSurface,
+          title: Text(
             'Remove Card',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: appTheme.navyText,
+            ),
           ),
           content: Text(
             'Are you sure you want to remove your ${_cards[index]['merchant']} loyalty card?',
+            style: TextStyle(color: appTheme.subtitle),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              child: Text('Cancel', style: TextStyle(color: appTheme.subtitle)),
             ),
             TextButton(
               onPressed: () {
@@ -426,27 +435,18 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.appTheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: const Text(
           'My Cards',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: Theme.of(context).dividerColor),
         ),
       ),
       body: _cards.isEmpty
@@ -457,22 +457,22 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                   Icon(
                     Icons.credit_card_off_outlined,
                     size: 64,
-                    color: Colors.grey[400],
+                    color: appTheme.subtitle,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'No Loyalty Cards Added',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: appTheme.navyText,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Add your favorite grocery & shopping cards\nso you don\'t miss out on savings.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    style: TextStyle(fontSize: 13, color: appTheme.subtitle),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
@@ -508,8 +508,10 @@ class _MyCardsScreenState extends State<MyCardsScreen> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Card(
                     clipBehavior: Clip.antiAlias,
-                    elevation: 3,
-                    shadowColor: Colors.black26,
+                    elevation: context.isDarkMode ? 0 : 3,
+                    shadowColor: Colors.black.withValues(
+                      alpha: context.isDarkMode ? 0.5 : 0.15,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),

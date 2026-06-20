@@ -1,5 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_theme_extension.dart';
 import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/models/store.dart';
 
@@ -21,6 +23,9 @@ class StoreCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.appTheme;
+    final isDark = context.isDarkMode;
+
     final String imageUrl = store.pages.isNotEmpty
         ? store.pages.first.imageUrl
         : '';
@@ -53,7 +58,7 @@ class StoreCard extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: Colors.grey[600],
+          color: theme.subtitle,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),
@@ -62,11 +67,14 @@ class StoreCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardSurface,
         borderRadius: BorderRadius.circular(8),
+        border: isDark
+            ? Border.all(color: theme.border.withValues(alpha: 0.6))
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.04),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -92,10 +100,10 @@ class StoreCard extends StatelessWidget {
                         children: [
                           Text(
                             store.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14.5,
-                              color: Color(0xFF1E293B),
+                              color: theme.navyText,
                               height: 1.2,
                             ),
                             maxLines: 1,
@@ -119,13 +127,13 @@ class StoreCard extends StatelessWidget {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  color: const Color(0xFFF8FAFC),
+                  color: theme.sectionBg,
                   child: imageUrl.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Icon(
                             Icons.image_outlined,
                             size: 32,
-                            color: Colors.grey,
+                            color: theme.subtitle,
                           ),
                         )
                       : LayoutBuilder(
@@ -143,21 +151,21 @@ class StoreCard extends StatelessWidget {
                               alignment: Alignment.topCenter,
                               memCacheWidth: targetW,
                               fadeInDuration: const Duration(milliseconds: 120),
-                              placeholder: (_, _) => const Center(
+                              placeholder: (_, _) => Center(
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: Color(0xFF0071CE),
+                                    color: context.brandBlue,
                                   ),
                                 ),
                               ),
-                              errorWidget: (_, _, _) => const Center(
+                              errorWidget: (_, _, _) => Center(
                                 child: Icon(
                                   Icons.broken_image_outlined,
                                   size: 24,
-                                  color: Colors.grey,
+                                  color: theme.subtitle,
                                 ),
                               ),
                             );
@@ -247,6 +255,8 @@ class _FavoriteHeartButtonState extends State<FavoriteHeartButton>
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.appTheme;
+
     return GestureDetector(
       onTap: () {
         if (widget.onTap != null) {
@@ -264,7 +274,7 @@ class _FavoriteHeartButtonState extends State<FavoriteHeartButton>
           child: Icon(
             widget.isFavorited ? Icons.favorite : Icons.favorite_border,
             size: 20,
-            color: widget.isFavorited ? Colors.red : const Color(0xFF8C96A3),
+            color: widget.isFavorited ? Colors.red : theme.chipInactive,
           ),
         ),
       ),

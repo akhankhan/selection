@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import '../../../core/theme/app_theme_extension.dart';
+import '../../settings/screens/email_signin_screen.dart';
+import '../../settings/services/apple_sign_in_service.dart';
 
 class ShareListSheet extends StatelessWidget {
   ShareListSheet({super.key});
@@ -11,11 +16,136 @@ class ShareListSheet extends StatelessWidget {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final appTheme = sheetContext.appTheme;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(sheetContext).size.height * 0.06,
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: appTheme.cardSurface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(
+                    alpha: sheetContext.isDarkMode ? 0.45 : 0.12,
+                  ),
+                  blurRadius: 24,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: ShareListSheet(),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleEmailSignIn(BuildContext context) async {
+    final signedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const EmailSignInScreen()),
+    );
+
+    if (signedIn == true && context.mounted) {
+      final user = FirebaseAuth.instance.currentUser;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Successfully signed in as ${user?.displayName ?? user?.email ?? "User"}!',
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleAppleSignIn(BuildContext context) async {
+    final available = await AppleSignInService.isAvailable();
+    if (!available) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Apple Sign-In is not available on this device.',
+          ),
+          backgroundColor: context.brandBlue,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final result = await AppleSignInService.requestAppleCredentialWithNonce();
+
+      if (!context.mounted) return;
+
+      _isLoading.value = true;
+
+      final userCredential = await AppleSignInService.signInWithFirebase(
+        appleCredential: result.credential,
+        rawNonce: result.rawNonce,
+      );
+
+      _isLoading.value = false;
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Successfully signed in as '
+              '${userCredential.user?.displayName ?? userCredential.user?.email ?? "User"}!',
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+          ),
+        );
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      _isLoading.value = false;
+      if (e.code == AuthorizationErrorCode.canceled) return;
+      if (context.mounted) {
+        _showAppleErrorDialog(context, AppleSignInService.authErrorMessage(e));
+      }
+    } on FirebaseAuthException catch (e) {
+      _isLoading.value = false;
+      if (context.mounted) {
+        _showAppleErrorDialog(context, AppleSignInService.authErrorMessage(e));
+      }
+    } catch (e) {
+      _isLoading.value = false;
+      if (context.mounted) {
+        _showAppleErrorDialog(context, AppleSignInService.authErrorMessage(e));
+      }
+    }
+  }
+
+  void _showAppleErrorDialog(BuildContext context, String message) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'Apple Sign-In Failed',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'OK',
+              style: TextStyle(
+                color: dialogContext.brandBlue,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
-      builder: (_) => ShareListSheet(),
     );
   }
 
@@ -94,6 +224,9 @@ class ShareListSheet extends StatelessWidget {
   }
 
   Widget _buildSignedOutContent(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
+
     return ValueListenableBuilder<bool>(
       valueListenable: _isLoading,
       builder: (context, isLoading, child) {
@@ -101,208 +234,316 @@ class ShareListSheet extends StatelessWidget {
           children: [
             SafeArea(
               top: false,
+              minimum: const EdgeInsets.only(bottom: 16),
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-              const SizedBox(height: 12),
-              const Text(
-                'Sign in to share your list',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Combine your list with a friend and\ncollaborate on a single shopping list.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF5F6368),
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _HandsIllustration(),
-              const SizedBox(height: 18),
-              InkWell(
-                onTap: () {},
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text(
-                      'Learn more about how sharing works',
-                      style: TextStyle(
-                        color: Color(0xFF0071CE),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                      _SheetHandle(appTheme: appTheme),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: context.brandBlue.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.people_outline_rounded,
+                              color: context.brandBlue,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Share your list',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: appTheme.navyText,
+                                    height: 1.15,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Shop together with friends & family',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: appTheme.subtitle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              color: appTheme.chipInactive,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(Icons.open_in_new, size: 14, color: Color(0xFF0071CE)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'To combine lists, connect with',
-                style: TextStyle(fontSize: 13, color: Colors.black54),
-              ),
-              const SizedBox(height: 12),
-              _SocialButton(
-                label: 'Continue with Facebook',
-                icon: _FacebookIcon(),
-                onTap: () {},
-              ),
-              const SizedBox(height: 10),
-              _SocialButton(
-                label: 'Continue with Google',
-                icon: _GoogleIcon(),
-                onTap: () => _handleGoogleSignIn(context),
-              ),
-              const SizedBox(height: 10),
-              _SocialButton(
-                label: 'Continue with email',
-                icon: const Icon(
-                  Icons.mail_outline,
-                  color: Colors.black87,
-                  size: 22,
-                ),
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'No thanks',
-                  style: TextStyle(
-                    color: Color(0xFF0071CE),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
+                      const SizedBox(height: 20),
+                      _ShareHeroCard(appTheme: appTheme),
+                      const SizedBox(height: 16),
+                      _BenefitChip(
+                        icon: Icons.checklist_rounded,
+                        label: 'Merge lists in real time',
+                        appTheme: appTheme,
+                      ),
+                      const SizedBox(height: 8),
+                      _BenefitChip(
+                        icon: Icons.notifications_active_outlined,
+                        label: 'Get notified when items are added',
+                        appTheme: appTheme,
+                      ),
+                      const SizedBox(height: 8),
+                      _BenefitChip(
+                        icon: Icons.devices_outlined,
+                        label: 'Stay synced across all devices',
+                        appTheme: appTheme,
+                      ),
+                      const SizedBox(height: 16),
+                      Material(
+                        color: appTheme.searchFill,
+                        borderRadius: BorderRadius.circular(10),
+                        child: InkWell(
+                          onTap: () {},
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 18,
+                                  color: context.brandBlue,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Learn how list sharing works',
+                                    style: TextStyle(
+                                      color: appTheme.navyText,
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 14,
+                                  color: appTheme.subtitle,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Divider(color: appTheme.border, height: 1),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              'Sign in to continue',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: appTheme.subtitle,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Divider(color: appTheme.border, height: 1),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      _SocialButton(
+                        label: 'Continue with Apple',
+                        icon: Icon(
+                          Icons.apple,
+                          color: colorScheme.onSurface,
+                          size: 24,
+                        ),
+                        onTap: () => _handleAppleSignIn(context),
+                      ),
+                      const SizedBox(height: 10),
+                      _SocialButton(
+                        label: 'Continue with Google',
+                        icon: _GoogleIcon(),
+                        onTap: () => _handleGoogleSignIn(context),
+                      ),
+                      const SizedBox(height: 10),
+                      _SocialButton(
+                        label: 'Continue with email',
+                        icon: Icon(
+                          Icons.mail_outline_rounded,
+                          color: colorScheme.onSurface,
+                          size: 22,
+                        ),
+                        onTap: () => _handleEmailSignIn(context),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        child: Text(
+                          'No thanks',
+                          style: TextStyle(
+                            color: context.brandBlue,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const _TermsText(),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              _TermsText(),
-              const SizedBox(height: 6),
-            ],
-          ),
-        ),
-      ),
-    ),
-    if (isLoading)
-      Positioned.fill(
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.7),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(16),
             ),
-          ),
-          child: const Center(
-            child: CircularProgressIndicator(
-              color: Color(0xFF0071CE),
-            ),
-          ),
-        ),
-      ),
-  ],
-);
-},
-);
-}
+            if (isLoading)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: appTheme.cardSurface.withValues(alpha: 0.88),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: context.brandBlue,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildSignedInContent(BuildContext context, User user) {
+    final appTheme = context.appTheme;
+
     return SafeArea(
       top: false,
+      minimum: const EdgeInsets.only(bottom: 16),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 12),
-              const Icon(
-                Icons.check_circle_outline,
-                size: 64,
-                color: Color(0xFF2E7D32),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Collaborate & Share!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
+              _SheetHandle(appTheme: appTheme),
+              const SizedBox(height: 20),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2E7D32).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  size: 40,
+                  color: Color(0xFF2E7D32),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Text(
-                'You are currently signed in as:\n${user.displayName ?? user.email ?? "User"}',
+                'You\'re ready to share',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14.5,
-                  color: Color(0xFF5F6368),
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: appTheme.navyText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Invite friends to collaborate on your shopping lists.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: appTheme.subtitle,
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 24),
-              // User info row
+              const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  color: appTheme.searchFill,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: appTheme.border),
                 ),
                 child: Row(
                   children: [
                     CircleAvatar(
-                      radius: 20,
-                      backgroundColor: const Color(0xFF0071CE).withValues(
-                        alpha: 0.1,
+                      radius: 22,
+                      backgroundColor: context.brandBlue.withValues(
+                        alpha: 0.12,
                       ),
                       backgroundImage: user.photoURL != null
                           ? NetworkImage(user.photoURL!)
                           : null,
                       child: user.photoURL == null
                           ? Text(
-                              (user.displayName ??
-                                  user.email ??
-                                  'U')[0]
+                              (user.displayName ?? user.email ?? 'U')[0]
                                   .toUpperCase(),
-                              style: const TextStyle(
-                                color: Color(0xFF0071CE),
+                              style: TextStyle(
+                                color: context.brandBlue,
                                 fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
                             )
                           : null,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             user.displayName ?? 'User',
-                            style: const TextStyle(
-                              fontSize: 14,
+                            style: TextStyle(
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E293B),
+                              color: appTheme.navyText,
                             ),
                           ),
+                          const SizedBox(height: 2),
                           Text(
                             user.email ?? '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF64748B),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: appTheme.subtitle,
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -310,47 +551,50 @@ class ShareListSheet extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-              // Share button
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                height: 48,
+                height: 52,
                 child: ElevatedButton.icon(
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Inviting friends feature enabled!'),
-                        backgroundColor: Color(0xFF0071CE),
+                      SnackBar(
+                        content: const Text(
+                          'Invite link copied — sharing coming soon!',
+                        ),
+                        backgroundColor: context.brandBlue,
                       ),
                     );
                   },
-                  icon: const Icon(Icons.share, color: Colors.white, size: 18),
+                  icon: const Icon(Icons.ios_share_rounded, size: 20),
                   label: const Text(
                     'Invite a Friend',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0071CE),
+                    backgroundColor: context.brandBlue,
+                    foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              // Sign out or close option
+              const SizedBox(height: 10),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text(
-                  'Dismiss',
+                style: TextButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                ),
+                child: Text(
+                  'Done',
                   style: TextStyle(
-                    color: Color(0xFF0071CE),
-                    fontWeight: FontWeight.bold,
+                    color: context.brandBlue,
+                    fontWeight: FontWeight.w600,
                     fontSize: 15,
                   ),
                 ),
@@ -359,6 +603,195 @@ class ShareListSheet extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SheetHandle extends StatelessWidget {
+  const _SheetHandle({required this.appTheme});
+
+  final AppThemeExtension appTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 40,
+        height: 4,
+        margin: const EdgeInsets.only(top: 4, bottom: 4),
+        decoration: BoxDecoration(
+          color: appTheme.subtitle.withValues(alpha: 0.35),
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShareHeroCard extends StatelessWidget {
+  const _ShareHeroCard({required this.appTheme});
+
+  final AppThemeExtension appTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final brandBlue = context.brandBlue;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            brandBlue.withValues(alpha: 0.18),
+            brandBlue.withValues(alpha: 0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: brandBlue.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _MiniListCard(appTheme: appTheme, label: 'Your list'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Icon(
+              Icons.sync_rounded,
+              color: brandBlue,
+              size: 28,
+            ),
+          ),
+          _MiniListCard(appTheme: appTheme, label: 'Friend'),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniListCard extends StatelessWidget {
+  const _MiniListCard({required this.appTheme, required this.label});
+
+  final AppThemeExtension appTheme;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 88,
+          height: 72,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: appTheme.cardSurface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: appTheme.border),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ListLine(appTheme: appTheme, checked: true),
+              const SizedBox(height: 6),
+              _ListLine(appTheme: appTheme, checked: true),
+              const SizedBox(height: 6),
+              _ListLine(appTheme: appTheme, checked: false),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: appTheme.subtitle,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ListLine extends StatelessWidget {
+  const _ListLine({required this.appTheme, required this.checked});
+
+  final AppThemeExtension appTheme;
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: checked
+                ? context.brandBlue.withValues(alpha: 0.15)
+                : Colors.transparent,
+            border: Border.all(
+              color: checked ? context.brandBlue : appTheme.border,
+              width: 1.2,
+            ),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: checked
+              ? Icon(Icons.check, size: 7, color: context.brandBlue)
+              : null,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: appTheme.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BenefitChip extends StatelessWidget {
+  const _BenefitChip({
+    required this.icon,
+    required this.label,
+    required this.appTheme,
+  });
+
+  final IconData icon;
+  final String label;
+  final AppThemeExtension appTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: context.brandBlue),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              color: appTheme.navyText,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -376,65 +809,68 @@ class _SocialButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 16),
-            SizedBox(width: 24, height: 24, child: Center(child: icon)),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 40),
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
+    final appTheme = context.appTheme;
+
+    return Material(
+      color: appTheme.searchFill,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            border: Border.all(color: appTheme.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Row(
+            children: [
+              SizedBox(width: 24, height: 24, child: Center(child: icon)),
+              Expanded(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: appTheme.navyText,
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FacebookIcon extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: const BoxDecoration(
-        color: Color(0xFF1877F2),
-        shape: BoxShape.circle,
-      ),
-      child: const Center(
-        child: Text(
-          'f',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            height: 1,
+              const SizedBox(width: 24),
+            ],
           ),
         ),
       ),
     );
   }
 }
+
+// class _FacebookIcon extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       width: 24,
+//       height: 24,
+//       decoration: const BoxDecoration(
+//         color: Color(0xFF1877F2),
+//         shape: BoxShape.circle,
+//       ),
+//       child: const Center(
+//         child: Text(
+//           'f',
+//           style: TextStyle(
+//             color: Colors.white,
+//             fontSize: 18,
+//             fontWeight: FontWeight.w900,
+//             height: 1,
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 class _GoogleIcon extends StatelessWidget {
   @override
@@ -523,262 +959,41 @@ class _GoogleIconPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _HandsIllustration extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 200,
-      height: 140,
-      child: CustomPaint(
-        size: const Size(200, 140),
-        painter: _HandsIllustrationPainter(),
-      ),
-    );
-  }
-}
-
-class _HandsIllustrationPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double w = size.width;
-    final double h = size.height;
-
-    // 1. Draw soft blue oval background
-    final Paint bgPaint = Paint()
-      ..color = const Color(0xFFF0F5FA)
-      ..style = PaintingStyle.fill;
-    canvas.drawOval(Rect.fromLTWH(0, 0, w, h), bgPaint);
-
-    // 2. Draw shopping list sheet (tilted white card in the center)
-    final Paint cardPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final Paint cardShadow = Paint()
-      ..color = const Color(0x10000000)
-      ..style = PaintingStyle.fill;
-
-    // Shadow rect
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.23, h * 0.16, w * 0.54, h * 0.70),
-        const Radius.circular(8),
-      ),
-      cardShadow,
-    );
-    // Real sheet rect
-    final RRect sheetRRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.25, h * 0.14, w * 0.50, h * 0.68),
-      const Radius.circular(8),
-    );
-    canvas.drawRRect(sheetRRect, cardPaint);
-
-    // Draw thin blue border around the sheet
-    final Paint borderPaint = Paint()
-      ..color = const Color(0xFFD8E5F3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawRRect(sheetRRect, borderPaint);
-
-    // 3. Draw lines and checkboxes on the sheet
-    final Paint linePaint = Paint()
-      ..color = const Color(0xFFE6EFF9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final Paint checkPaint = Paint()
-      ..color = const Color(0xFF4FA0F9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    final Paint checkedBg = Paint()
-      ..color = const Color(0xFFE8F1FC)
-      ..style = PaintingStyle.fill;
-
-    // Checkbox 1 (Checked)
-    final double cb1Top = h * 0.24;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.32, cb1Top, 15, 11),
-        const Radius.circular(2),
-      ),
-      checkedBg,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.32, cb1Top, 15, 11),
-        const Radius.circular(2),
-      ),
-      checkPaint,
-    );
-    // Draw check mark
-    final Path checkPath = Path()
-      ..moveTo(w * 0.32 + 3, cb1Top + 5)
-      ..lineTo(w * 0.32 + 6, cb1Top + 8)
-      ..lineTo(w * 0.32 + 11, cb1Top + 3);
-    canvas.drawPath(
-      checkPath,
-      Paint()
-        ..color = const Color(0xFF0071CE)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8,
-    );
-
-    // Lines for item 1
-    canvas.drawLine(
-      Offset(w * 0.44, cb1Top + 5),
-      Offset(w * 0.68, cb1Top + 5),
-      linePaint,
-    );
-
-    // Checkbox 2 (Checked)
-    final double cb2Top = h * 0.42;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.32, cb2Top, 15, 11),
-        const Radius.circular(2),
-      ),
-      checkedBg,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.32, cb2Top, 15, 11),
-        const Radius.circular(2),
-      ),
-      checkPaint,
-    );
-    // Draw check mark
-    final Path checkPath2 = Path()
-      ..moveTo(w * 0.32 + 3, cb2Top + 5)
-      ..lineTo(w * 0.32 + 6, cb2Top + 8)
-      ..lineTo(w * 0.32 + 11, cb2Top + 3);
-    canvas.drawPath(
-      checkPath2,
-      Paint()
-        ..color = const Color(0xFF0071CE)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.8,
-    );
-    // Lines for item 2
-    canvas.drawLine(
-      Offset(w * 0.44, cb2Top + 5),
-      Offset(w * 0.62, cb2Top + 5),
-      linePaint,
-    );
-
-    // Checkbox 3 (Unchecked)
-    final double cb3Top = h * 0.60;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.32, cb3Top, 15, 11),
-        const Radius.circular(2),
-      ),
-      checkPaint,
-    );
-    // Lines for item 3
-    canvas.drawLine(
-      Offset(w * 0.44, cb3Top + 5),
-      Offset(w * 0.58, cb3Top + 5),
-      linePaint,
-    );
-
-    // 4. Draw Left Hand (Sleeve, Watch, Hand pointing to Checkbox 1)
-    final Paint skinPaint = Paint()..color = const Color(0xFFFCBEA1);
-    final Paint watchPaint = Paint()..color = const Color(0xFF6B7A82);
-    final Paint sleevePaint1 = Paint()
-      ..color = const Color(0xFFED836F); // Peach-red sleeve
-
-    // Left Arm/Sleeve
-    final Path sleevePath1 = Path()
-      ..moveTo(0, h * 0.38)
-      ..lineTo(w * 0.16, h * 0.30)
-      ..lineTo(w * 0.22, h * 0.48)
-      ..lineTo(w * 0.05, h * 0.56)
-      ..close();
-    canvas.drawPath(sleevePath1, sleevePaint1);
-
-    // Watch
-    canvas.drawOval(Rect.fromLTWH(w * 0.13, h * 0.38, 10, 8), watchPaint);
-
-    // Left Hand pointing finger
-    final Path handPath1 = Path()
-      ..moveTo(w * 0.16, h * 0.38)
-      ..quadraticBezierTo(
-        w * 0.22,
-        h * 0.40,
-        w * 0.32,
-        h * 0.46,
-      ) // Pointing finger
-      ..lineTo(w * 0.34, h * 0.48)
-      ..quadraticBezierTo(w * 0.36, h * 0.50, w * 0.34, h * 0.52)
-      ..lineTo(w * 0.24, h * 0.54)
-      ..lineTo(w * 0.18, h * 0.46)
-      ..close();
-    canvas.drawPath(handPath1, skinPaint);
-
-    // 5. Draw Right Hand (pointing to Checkbox 2)
-    final Paint sleevePaint2 = Paint()
-      ..color = const Color(0xFFED836F); // Reddish sleeve
-
-    // Right Arm/Sleeve
-    final Path sleevePath2 = Path()
-      ..moveTo(w, h * 0.48)
-      ..lineTo(w * 0.84, h * 0.42)
-      ..lineTo(w * 0.78, h * 0.60)
-      ..lineTo(w * 0.94, h * 0.66)
-      ..close();
-    canvas.drawPath(sleevePath2, sleevePaint2);
-
-    // Right Hand pointing finger
-    final Path handPath2 = Path()
-      ..moveTo(w * 0.84, h * 0.50)
-      ..quadraticBezierTo(
-        w * 0.78,
-        h * 0.52,
-        w * 0.68,
-        h * 0.58,
-      ) // Pointing finger
-      ..lineTo(w * 0.66, h * 0.60)
-      ..quadraticBezierTo(w * 0.64, h * 0.62, w * 0.66, h * 0.64)
-      ..lineTo(w * 0.74, h * 0.66)
-      ..lineTo(w * 0.80, h * 0.58)
-      ..close();
-    canvas.drawPath(handPath2, skinPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 class _TermsText extends StatelessWidget {
+  const _TermsText();
+
   @override
   Widget build(BuildContext context) {
-    const link = TextStyle(
-      fontSize: 12,
-      color: Color(0xFF0071CE),
+    final appTheme = context.appTheme;
+
+    final link = TextStyle(
+      fontSize: 11.5,
+      color: context.brandBlue,
       fontWeight: FontWeight.w600,
     );
-    const normal = TextStyle(fontSize: 12, color: Colors.black54, height: 1.4);
-    return Text.rich(
-      const TextSpan(
-        children: [
-          TextSpan(text: 'By continuing, you agree to our ', style: normal),
-          TextSpan(text: 'Terms of Use', style: link),
-          TextSpan(
-            text:
-                ' and the collection and use of your data as described in our ',
-            style: normal,
-          ),
-          TextSpan(text: 'Privacy\nPolicy', style: link),
-          TextSpan(
-            text:
-                '. If you\'d like to opt out or learn more about your data options, please review our ',
-            style: normal,
-          ),
-          TextSpan(text: 'Privacy Policy', style: link),
-          TextSpan(text: '.', style: normal),
-        ],
+    final normal = TextStyle(
+      fontSize: 11.5,
+      color: appTheme.subtitle,
+      height: 1.45,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: 'By continuing, you agree to our ',
+              style: normal,
+            ),
+            TextSpan(text: 'Terms of Use', style: link),
+            TextSpan(text: ' and ', style: normal),
+            TextSpan(text: 'Privacy Policy', style: link),
+            TextSpan(text: '.', style: normal),
+          ],
+        ),
+        textAlign: TextAlign.center,
       ),
-      textAlign: TextAlign.center,
     );
   }
 }

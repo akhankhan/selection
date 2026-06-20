@@ -2,17 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import '../../../core/theme/app_theme_extension.dart';
+import '../services/apple_sign_in_service.dart';
+import 'email_signin_screen.dart';
 
 class SignInScreen extends StatelessWidget {
   SignInScreen({super.key});
 
   final ValueNotifier<bool> _isLoading = ValueNotifier(false);
 
-  static const Color _brandBlue = Color(0xFF0071CE);
-  static const Color _navyDark = Color(0xFF1E293B);
-
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
+
     return Scaffold(
       backgroundColor: const Color(0xFF7F7F7F).withValues(
         alpha: 0.5,
@@ -36,9 +41,11 @@ class SignInScreen extends StatelessWidget {
                   children: [
                     Container(
               width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -49,31 +56,31 @@ class SignInScreen extends StatelessWidget {
                     width: 38,
                     height: 4.5,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: appTheme.border,
                       borderRadius: BorderRadius.circular(2.5),
                     ),
                   ),
                   const SizedBox(height: 24),
 
                   // Title Block
-                  const Text(
+                  Text(
                     'Sign in to Flipp',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.black54,
+                      color: appTheme.subtitle,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
                       'Unlock a smarter way to shop',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: _navyDark,
+                        color: appTheme.navyText,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -81,7 +88,7 @@ class SignInScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // 3 Card Carousel
-                  _buildFlyersRow(),
+                  _buildFlyersRow(context),
                   const SizedBox(height: 24),
 
                   // Benefits checklist
@@ -89,13 +96,18 @@ class SignInScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 36),
                     child: Column(
                       children: [
-                        _buildBenefitRow('Build and share your shopping list'),
+                        _buildBenefitRow(
+                          context,
+                          'Build and share your shopping list',
+                        ),
                         const SizedBox(height: 12),
                         _buildBenefitRow(
+                          context,
                           'Easy access to your favourite stores',
                         ),
                         const SizedBox(height: 12),
                         _buildBenefitRow(
+                          context,
                           'Deals synced across all your devices',
                         ),
                       ],
@@ -108,14 +120,22 @@ class SignInScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Column(
                       children: [
+                        // _buildSocialButton(
+                        //   icon: Icons.facebook,
+                        //   iconColor: const Color(0xFF1877F2),
+                        //   label: 'Continue with Facebook',
+                        //   onTap: () => _handleLogin(context, 'Facebook'),
+                        // ),
+                        // const SizedBox(height: 12),
                         _buildSocialButton(
-                          icon: Icons.facebook,
-                          iconColor: const Color(0xFF1877F2),
-                          label: 'Continue with Facebook',
-                          onTap: () => _handleLogin(context, 'Facebook'),
+                          context,
+                          iconImage: 'apple',
+                          label: 'Continue with Apple',
+                          onTap: () => _handleAppleLogin(context),
                         ),
                         const SizedBox(height: 12),
                         _buildSocialButton(
+                          context,
                           iconImage:
                               'google', // Simulated custom colorful Google icon
                           label: 'Continue with Google',
@@ -123,10 +143,11 @@ class SignInScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 12),
                         _buildSocialButton(
+                          context,
                           icon: Icons.email_outlined,
-                          iconColor: Colors.grey[700],
+                          iconColor: appTheme.subtitle,
                           label: 'Continue with email',
-                          onTap: () => _handleLogin(context, 'Email'),
+                          onTap: () => _handleEmailLogin(context),
                         ),
                       ],
                     ),
@@ -136,10 +157,10 @@ class SignInScreen extends StatelessWidget {
                   // Not now link
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Text(
+                    child: Text(
                       'Not now',
                       style: TextStyle(
-                        color: _brandBlue,
+                        color: context.brandBlue,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -155,40 +176,40 @@ class SignInScreen extends StatelessWidget {
                         text: 'By continuing, you agree to our ',
                         style: TextStyle(
                           fontSize: 11.5,
-                          color: Colors.grey[500],
+                          color: appTheme.subtitle,
                           height: 1.45,
                         ),
-                        children: const [
+                        children: [
                           TextSpan(
                             text: 'Terms of Use',
                             style: TextStyle(
-                              color: _brandBlue,
+                              color: context.brandBlue,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          TextSpan(
+                          const TextSpan(
                             text:
                                 ' and the collection and use of your data as described in our ',
                           ),
                           TextSpan(
                             text: 'Privacy Policy',
                             style: TextStyle(
-                              color: _brandBlue,
+                              color: context.brandBlue,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          TextSpan(
+                          const TextSpan(
                             text:
                                 '. If you\'d like to opt out or learn more about your data options, please review our ',
                           ),
                           TextSpan(
                             text: 'Privacy Policy',
                             style: TextStyle(
-                              color: _brandBlue,
+                              color: context.brandBlue,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          TextSpan(text: '.'),
+                          const TextSpan(text: '.'),
                         ],
                       ),
                       textAlign: TextAlign.center,
@@ -201,14 +222,14 @@ class SignInScreen extends StatelessWidget {
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: colorScheme.surface.withValues(alpha: 0.7),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(24),
                     ),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: CircularProgressIndicator(
-                      color: _brandBlue,
+                      color: context.brandBlue,
                     ),
                   ),
                 ),
@@ -223,7 +244,7 @@ class SignInScreen extends StatelessWidget {
 );
 }
 
-  Widget _buildFlyersRow() {
+  Widget _buildFlyersRow(BuildContext context) {
     return SizedBox(
       height: 150,
       child: ListView(
@@ -233,6 +254,7 @@ class SignInScreen extends StatelessWidget {
             const NeverScrollableScrollPhysics(), // Match static screenshot feel
         children: [
           _buildFlyerMockCard(
+            context,
             brandName: 'FRESH CO',
             color: const Color(0xFF8DC63F),
             subLabel: 'Lower Food Prices',
@@ -251,6 +273,7 @@ class SignInScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           _buildFlyerMockCard(
+            context,
             brandName: 'NO FRILLS',
             color: const Color(0xFFFFD200),
             subLabel: 'Won\'t Be Beat',
@@ -270,6 +293,7 @@ class SignInScreen extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           _buildFlyerMockCard(
+            context,
             brandName: 'Walmart',
             color: const Color(0xFF0071CE),
             subLabel: 'Save money. Live better.',
@@ -291,19 +315,23 @@ class SignInScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFlyerMockCard({
+  Widget _buildFlyerMockCard(
+    BuildContext context, {
     required String brandName,
     required Color color,
     required String subLabel,
     Color textColor = Colors.white,
     required List<Map<String, dynamic>> items,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
+
     return Container(
       width: 110,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey[200]!, width: 1),
+        border: Border.all(color: appTheme.border, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -364,7 +392,7 @@ class SignInScreen extends StatelessWidget {
                 children: items.map((item) {
                   return Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: appTheme.sectionBg,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     padding: const EdgeInsets.all(3),
@@ -390,9 +418,9 @@ class SignInScreen extends StatelessWidget {
                           item['title'],
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 6,
-                            color: Colors.black54,
+                            color: appTheme.subtitle,
                           ),
                         ),
                         Text(
@@ -415,7 +443,7 @@ class SignInScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildBenefitRow(String benefit) {
+  Widget _buildBenefitRow(BuildContext context, String benefit) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -427,10 +455,10 @@ class SignInScreen extends StatelessWidget {
         Expanded(
           child: Text(
             benefit,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w600,
-              color: _navyDark,
+              color: context.appTheme.navyText,
             ),
           ),
         ),
@@ -438,15 +466,19 @@ class SignInScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSocialButton({
+  Widget _buildSocialButton(
+    BuildContext context, {
     IconData? icon,
     Color? iconColor,
     String? iconImage,
     required String label,
     required VoidCallback onTap,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final appTheme = context.appTheme;
+
     return Material(
-      color: Colors.white,
+      color: colorScheme.surface,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
@@ -454,7 +486,7 @@ class SignInScreen extends StatelessWidget {
         child: Container(
           height: 48,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFD8DBE2), width: 1.2),
+            border: Border.all(color: appTheme.border, width: 1.2),
             borderRadius: BorderRadius.circular(8),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -466,13 +498,15 @@ class SignInScreen extends StatelessWidget {
                   height: 22,
                   child: CustomPaint(painter: GoogleLogoPainter()),
                 )
+              else if (iconImage == 'apple')
+                Icon(Icons.apple, color: colorScheme.onSurface, size: 24)
               else
                 Icon(icon, color: iconColor, size: 22),
               const Expanded(child: SizedBox()),
               Text(
                 label,
-                style: const TextStyle(
-                  color: _navyDark,
+                style: TextStyle(
+                  color: appTheme.navyText,
                   fontWeight: FontWeight.bold,
                   fontSize: 15.5,
                 ),
@@ -514,27 +548,127 @@ class SignInScreen extends StatelessWidget {
     }
   }
 
-  void _handleLogin(BuildContext context, String provider) async {
-    if (provider != 'Google') {
+  Future<void> _handleEmailLogin(BuildContext context) async {
+    final signedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const EmailSignInScreen()),
+    );
+
+    if (signedIn == true && context.mounted) {
+      final user = FirebaseAuth.instance.currentUser;
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Logging in with $provider...'),
-          backgroundColor: _brandBlue,
+          content: Text(
+            'Successfully signed in as ${user?.displayName ?? user?.email ?? "User"}!',
+          ),
+          backgroundColor: const Color(0xFF2E7D32),
         ),
       );
-      Future.delayed(const Duration(seconds: 1), () {
-        if (context.mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Successfully signed in with $provider!'),
-              backgroundColor: const Color(0xFF2E7D32),
-            ),
-          );
-        }
-      });
+    }
+  }
+
+  Future<void> _handleAppleLogin(BuildContext context) async {
+    final available = await AppleSignInService.isAvailable();
+    if (!available) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Apple Sign-In is not available on this device.',
+          ),
+          backgroundColor: context.brandBlue,
+        ),
+      );
       return;
     }
+
+    debugPrint('[Apple Sign-In] Starting Apple authentication...');
+
+    try {
+      final result = await AppleSignInService.requestAppleCredentialWithNonce();
+
+      if (!context.mounted) return;
+
+      _isLoading.value = true;
+
+      final userCredential = await AppleSignInService.signInWithFirebase(
+        appleCredential: result.credential,
+        rawNonce: result.rawNonce,
+      );
+
+      await _upsertUserDoc(userCredential.user);
+      _isLoading.value = false;
+
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Successfully signed in as '
+              '${userCredential.user?.displayName ?? userCredential.user?.email ?? "User"}!',
+            ),
+            backgroundColor: const Color(0xFF2E7D32),
+          ),
+        );
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      _isLoading.value = false;
+      if (e.code == AuthorizationErrorCode.canceled) return;
+      debugPrint('[Apple Sign-In ERROR] $e');
+      if (context.mounted) {
+        _showAppleErrorDialog(
+          context,
+          AppleSignInService.authErrorMessage(e),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      _isLoading.value = false;
+      debugPrint('[Apple Sign-In ERROR] ${e.code}: ${e.message}');
+      if (context.mounted) {
+        _showAppleErrorDialog(
+          context,
+          AppleSignInService.authErrorMessage(e),
+        );
+      }
+    } catch (e) {
+      _isLoading.value = false;
+      debugPrint('[Apple Sign-In ERROR] $e');
+      if (context.mounted) {
+        _showAppleErrorDialog(
+          context,
+          AppleSignInService.authErrorMessage(e),
+        );
+      }
+    }
+  }
+
+  void _showAppleErrorDialog(BuildContext context, String message) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text(
+          'Apple Sign-In Failed',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'OK',
+              style: TextStyle(
+                color: dialogContext.brandBlue,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleLogin(BuildContext context, String provider) async {
+    if (provider != 'Google') return;
 
     // Google Sign-In Flow
     _isLoading.value = true;
