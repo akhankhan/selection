@@ -90,7 +90,7 @@ class PushNotificationService {
         return const PushRegistrationResult(
           PushRegistrationStatus.permissionDenied,
           message:
-              'Notification permission was denied. Turn on alerts in iPhone Settings → Selection → Notifications.',
+              'Notification permission was denied. Turn on alerts in iPhone Settings → MENU2GO → Notifications.',
         );
       }
 

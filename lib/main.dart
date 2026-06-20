@@ -124,7 +124,7 @@ class _MyAppState extends State<MyApp> {
       builder: (context, _) {
         return MaterialApp(
           navigatorKey: AppNavigator.key,
-          title: 'Selection Flyer Viewer',
+          title: 'MENU2GO',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,

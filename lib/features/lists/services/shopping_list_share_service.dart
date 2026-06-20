@@ -7,10 +7,10 @@ class ShoppingListShareService {
 
   static String formatList(ShoppingListManager manager) {
     if (manager.totalItemCount == 0) {
-      return 'My Selection shopping list is empty.';
+      return 'My MENU2GO shopping list is empty.';
     }
 
-    final buffer = StringBuffer('My Selection shopping list\n\n');
+    final buffer = StringBuffer('My MENU2GO shopping list\n\n');
     for (final section in manager.sections) {
       if (section.items.isEmpty) continue;
       buffer.writeln('${section.title}:');
@@ -22,7 +22,7 @@ class ShoppingListShareService {
       }
       buffer.writeln();
     }
-    buffer.writeln('Shared from Selection');
+    buffer.writeln('Shared from MENU2GO');
     return buffer.toString().trim();
   }
 

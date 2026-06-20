@@ -30,13 +30,13 @@ class _LegalDocumentScreenState extends State<LegalDocumentScreen> {
   bool _loading = true;
   bool _error = false;
   Timer? _loadTimeout;
+  Brightness? _loadedBrightness;
 
   @override
   void initState() {
     super.initState();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (_) => _finishLoading(),
@@ -47,12 +47,26 @@ class _LegalDocumentScreenState extends State<LegalDocumentScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final brightness = Theme.of(context).brightness;
+    if (_loadedBrightness != null && _loadedBrightness != brightness) {
+      _loadedBrightness = null;
+      _reload();
+    }
+  }
+
+  @override
   void dispose() {
     _loadTimeout?.cancel();
     super.dispose();
   }
 
   Future<void> _loadContent() async {
+    final brightness = Theme.of(context).brightness;
+    final background = Theme.of(context).scaffoldBackgroundColor;
+    await _controller.setBackgroundColor(background);
+
     _loadTimeout?.cancel();
     _loadTimeout = Timer(const Duration(seconds: 10), () {
       if (mounted && _loading) {
@@ -66,8 +80,11 @@ class _LegalDocumentScreenState extends State<LegalDocumentScreen> {
     try {
       final firestoreHtml = widget.firestoreHtml?.trim();
       if (firestoreHtml != null && firestoreHtml.isNotEmpty) {
-        await _controller.loadHtmlString(await _inlineStyles(firestoreHtml));
+        await _controller.loadHtmlString(
+          await _prepareHtml(firestoreHtml, brightness),
+        );
         if (!mounted) return;
+        _loadedBrightness = brightness;
         _finishLoading();
         return;
       }
@@ -76,12 +93,14 @@ class _LegalDocumentScreenState extends State<LegalDocumentScreen> {
       if (!mounted) return;
 
       if (hosted != null) {
-        final baseUrl = widget.url.substring(0, widget.url.lastIndexOf('/') + 1);
-        await _controller.loadHtmlString(hosted, baseUrl: baseUrl);
+        await _controller.loadHtmlString(
+          await _prepareHtml(hosted, brightness),
+        );
       } else {
-        final html = await _loadBundledHtml();
+        final html = await _loadBundledHtml(brightness);
         await _controller.loadHtmlString(html);
       }
+      _loadedBrightness = brightness;
       _finishLoading();
     } catch (_) {
       if (mounted) {
@@ -93,16 +112,87 @@ class _LegalDocumentScreenState extends State<LegalDocumentScreen> {
     }
   }
 
+  Future<String> _prepareHtml(String html, Brightness brightness) async {
+    var prepared = await _inlineStyles(html);
+    prepared = _applyThemeClass(prepared, brightness);
+    prepared = _injectAppThemeStyles(prepared, brightness);
+    return prepared;
+  }
+
+  String _applyThemeClass(String html, Brightness brightness) {
+    final themeClass =
+        brightness == Brightness.dark ? 'theme-dark' : 'theme-light';
+
+    return html.replaceFirstMapped(
+      RegExp(r'<html(\s[^>]*)?>', caseSensitive: false),
+      (match) {
+        final attrs = match.group(1) ?? '';
+        final classPattern = RegExp(r'\sclass="([^"]*)"');
+
+        if (classPattern.hasMatch(attrs)) {
+          final updatedAttrs = attrs.replaceFirstMapped(classPattern, (m) {
+            final classes = (m.group(1) ?? '')
+                .split(' ')
+                .where((c) => c != 'theme-dark' && c != 'theme-light')
+                .join(' ');
+            final merged =
+                classes.isEmpty ? themeClass : '$classes $themeClass';
+            return ' class="$merged"';
+          });
+          return '<html$updatedAttrs>';
+        }
+
+        return '<html$attrs class="$themeClass">';
+      },
+    );
+  }
+
+  String _injectAppThemeStyles(String html, Brightness brightness) {
+    final withoutPrevious = html.replaceAll(
+      RegExp(r'<style id="flutter-app-theme">[\s\S]*?</style>'),
+      '',
+    );
+
+    final isDark = brightness == Brightness.dark;
+    final bg = isDark ? '#121212' : '#ffffff';
+    final text = isDark ? '#e8eaed' : '#1a1a2e';
+    final muted = isDark ? '#9aa0a6' : '#5c6370';
+    final accent = isDark ? '#4da3ff' : '#0071ce';
+    final card = isDark ? '#252525' : '#f4f6f8';
+
+    final themeBlock = '''
+<style id="flutter-app-theme">
+  html, body, main {
+    background-color: $bg !important;
+    color: $text !important;
+  }
+  h1, a { color: $accent !important; }
+  h2, p, li, strong { color: $text !important; }
+  .updated { color: $muted !important; }
+  .card { background-color: $card !important; }
+</style>''';
+
+    if (withoutPrevious.contains('</head>')) {
+      return withoutPrevious.replaceFirst('</head>', '$themeBlock</head>');
+    }
+    return '$themeBlock$withoutPrevious';
+  }
+
   Future<String> _inlineStyles(String html) async {
-    if (html.contains('<style>') || !html.contains('styles.css')) {
+    final linkPattern = RegExp(r'<link rel="stylesheet" href="[^"]+"\s*/?>');
+    if (html.contains('<style>') && !linkPattern.hasMatch(html)) {
       return html;
     }
+
     try {
       final css = await rootBundle.loadString(_stylesAsset);
-      return html.replaceFirst(
-        RegExp(r'<link rel="stylesheet" href="[^"]+"\s*/>'),
-        '<style>$css</style>',
-      );
+      if (linkPattern.hasMatch(html)) {
+        return html.replaceFirst(linkPattern, '<style>$css</style>');
+      }
+      if (!html.contains('<style>')) {
+        return html.replaceFirst('</head>', '<style>$css</style></head>');
+      }
+      return html;
     } catch (_) {
       return html;
     }
@@ -122,13 +212,9 @@ class _LegalDocumentScreenState extends State<LegalDocumentScreen> {
     return null;
   }
 
-  Future<String> _loadBundledHtml() async {
+  Future<String> _loadBundledHtml(Brightness brightness) async {
     final html = await rootBundle.loadString(widget.assetPath);
-    final css = await rootBundle.loadString(_stylesAsset);
-    return html.replaceFirst(
-      RegExp(r'<link rel="stylesheet" href="[^"]+"\s*/>'),
-      '<style>$css</style>',
-    );
+    return _prepareHtml(html, brightness);
   }
 
   void _finishLoading() {

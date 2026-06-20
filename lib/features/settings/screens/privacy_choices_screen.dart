@@ -358,7 +358,7 @@ class _PrivacyChoicesScreenState extends State<PrivacyChoicesScreen> {
                     const SizedBox(height: 16),
                     _buildDisclaimerText(
                       context,
-                      'If you would like to know the categories of information Flipp collects with respect to all users, '
+                      'If you would like to know the categories of information MENU2GO collects with respect to all users, '
                       'please refer to the privacy policy.',
                     ),
                     const SizedBox(height: 12),

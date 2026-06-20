@@ -3,6 +3,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/legal_documents_service.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../widgets/sign_in_required_gate.dart';
+import 'live_chat_screen.dart';
 
 class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
@@ -49,7 +51,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       scheme: 'mailto',
       path: docs.supportEmail,
       queryParameters: {
-        'subject': 'Selection App Support',
+        'subject': 'MENU2GO Support',
       },
     );
     if (await canLaunchUrl(uri)) {
@@ -65,14 +67,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     );
   }
 
-  void _showLiveChatMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Live chat is coming soon. Please email us for now.',
-        ),
-        backgroundColor: context.brandBlue,
-      ),
+  Future<void> _openLiveChat() async {
+    final signedIn = await ensureSignedIn(context);
+    if (!signedIn || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const LiveChatScreen()),
     );
   }
 
@@ -333,7 +332,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: _showLiveChatMessage,
+                          onPressed: _openLiveChat,
                           icon: const Icon(
                             Icons.chat_bubble_outline,
                             size: 18,

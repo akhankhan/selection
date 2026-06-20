@@ -633,13 +633,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: context.brandBlue.withValues(alpha: 0.1),
-                child: Icon(
-                  Icons.local_offer_outlined,
-                  size: 18,
-                  color: context.brandBlue,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/branding/app_logo.png',
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.cover,
                 ),
               ),
               const SizedBox(width: 10),

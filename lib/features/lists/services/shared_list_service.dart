@@ -162,7 +162,7 @@ class SharedListService {
   Future<void> shareInviteLink() async {
     final invite = await createOrUpdateInvite();
     final message =
-        'Join my Selection shopping list!\n\nCode: ${invite.inviteCode}\nLink: ${invite.inviteUrl}\n\nTap the link to open the app with this code ready.';
+        'Join my MENU2GO shopping list!\n\nCode: ${invite.inviteCode}\nLink: ${invite.inviteUrl}\n\nTap the link to open the app with this code ready.';
     await SharePlus.instance.share(ShareParams(text: message));
   }
 

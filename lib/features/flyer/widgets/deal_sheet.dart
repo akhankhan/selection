@@ -106,7 +106,7 @@ class _DealSheetState extends State<DealSheet> {
     if (trimmedDates.isNotEmpty) {
       buffer.write('\nValid $trimmedDates');
     }
-    buffer.write('\nBrowse deals in Selection.');
+    buffer.write('\nBrowse deals in MENU2GO.');
     await SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }
 

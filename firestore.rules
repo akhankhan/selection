@@ -3,7 +3,20 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {
       return request.auth != null
+        && request.auth.token.email != null
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
+    }
+
+    function validStoreRequest(data) {
+      return data.keys().hasAll(['storeName', 'location', 'status', 'createdAt'])
+        && data.storeName is string
+        && data.storeName.size() > 0
+        && data.storeName.size() <= 200
+        && data.location is string
+        && data.location.size() > 0
+        && data.location.size() <= 200
+        && data.status == 'pending'
+        && (!('comments' in data) || (data.comments is string && data.comments.size() <= 2000));
     }
 
     match /stores/{storeId}/{document=**} {
@@ -59,17 +72,33 @@ service cloud.firestore {
       allow create: if validStoreRequest(request.resource.data);
       allow read, update, delete: if false;
     }
-  }
 
-  function validStoreRequest(data) {
-    return data.keys().hasAll(['storeName', 'location', 'status', 'createdAt'])
-      && data.storeName is string
-      && data.storeName.size() > 0
-      && data.storeName.size() <= 200
-      && data.location is string
-      && data.location.size() > 0
-      && data.location.size() <= 200
-      && data.status == 'pending'
-      && (!('comments' in data) || (data.comments is string && data.comments.size() <= 2000));
+    // conversationId == Firebase Auth uid (one thread per user)
+    match /support_conversations/{conversationId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == conversationId || isAdmin());
+      allow create: if request.auth != null
+        && request.auth.uid == conversationId;
+      allow update: if request.auth != null
+        && (request.auth.uid == conversationId || isAdmin());
+
+      match /messages/{messageId} {
+        allow read: if request.auth != null
+          && (request.auth.uid == conversationId || isAdmin());
+        allow create: if request.auth != null
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000
+          && (
+            (request.auth.uid == conversationId
+              && request.resource.data.senderRole == 'user'
+              && request.resource.data.senderId == request.auth.uid)
+            || (isAdmin()
+              && request.resource.data.senderRole == 'admin'
+              && request.resource.data.senderId == request.auth.uid)
+          );
+        allow update, delete: if false;
+      }
+    }
   }
 }

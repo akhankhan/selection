@@ -448,7 +448,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildDivider(),
                     _buildTile(
                       title: 'Sign Out',
-                      subtitle: 'Sign out of your Flipp account',
+                      subtitle: 'Sign out of your MENU2GO account',
                       onTap: () async {
                         await FirebaseAuth.instance.signOut();
                         try {
@@ -477,7 +477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildCheckboxTile(
             title: 'Accept Push Notifications',
             subtitle:
-                'Allow Flipp to notify you of the latest deals in your area',
+                'Allow MENU2GO to notify you of the latest deals in your area',
             value: _acceptNotifications,
             onChanged: (val) async {
               final result =

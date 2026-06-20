@@ -65,7 +65,7 @@ class SignInScreen extends StatelessWidget {
 
                   // Title Block
                   Text(
-                    'Sign in to Flipp',
+                    'Sign in to MENU2GO',
                     style: TextStyle(
                       fontSize: 14,
                       color: appTheme.subtitle,

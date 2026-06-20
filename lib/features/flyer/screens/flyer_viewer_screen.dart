@@ -298,7 +298,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     if (trimmedDates.isNotEmpty) {
       buffer.write(' ($trimmedDates)');
     }
-    buffer.write('\nBrowse deals in Selection.');
+    buffer.write('\nBrowse deals in MENU2GO.');
     await SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }
 

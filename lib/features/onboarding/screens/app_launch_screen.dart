@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/storage/onboarding_store.dart';
-import '../../../core/theme/app_theme_extension.dart';
 import '../../browse/screens/browse_screen.dart';
 import 'onboarding_screen.dart';
+
+const _brandPink = Color(0xFFEC3090);
 
 class AppLaunchScreen extends StatefulWidget {
   const AppLaunchScreen({super.key});
@@ -45,52 +46,24 @@ class _AppLaunchScreenState extends State<AppLaunchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final appTheme = context.appTheme;
-
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: _brandPink,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                color: context.brandBlue,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.local_offer,
-                color: Colors.white,
-                size: 44,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Flipp',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: appTheme.navyText,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Deals & shopping lists',
-              style: TextStyle(
-                fontSize: 14,
-                color: appTheme.subtitle,
-              ),
+            Image.asset(
+              'assets/branding/app_logo_mark.png',
+              width: 220,
+              fit: BoxFit.contain,
             ),
             const SizedBox(height: 32),
-            SizedBox(
+            const SizedBox(
               width: 28,
               height: 28,
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                color: context.brandBlue,
+                color: Colors.white,
               ),
             ),
           ],

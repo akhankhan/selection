@@ -190,7 +190,7 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
                 Text(
                   _isSignUp
                       ? 'Tell us your name, then set up your email and password.'
-                      : 'Enter the email and password for your Flipp account.',
+                      : 'Enter the email and password for your MENU2GO account.',
                   style: TextStyle(
                     fontSize: 15,
                     color: appTheme.subtitle,
