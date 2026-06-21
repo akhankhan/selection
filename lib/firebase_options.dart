@@ -50,21 +50,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCYFjROdK7QgXZL2TPmpFRhvNyJI197RTk',
-    appId: '1:699002286605:android:d2a585ee99dcc76759db44',
-    messagingSenderId: '699002286605',
-    projectId: 'selection-admin',
-    storageBucket: 'selection-admin.firebasestorage.app',
+    apiKey: 'AIzaSyDBWw8_Qlm-1nuIyRtqzuh2zw413gqjafI',
+    appId: '1:345903148434:android:5378c6cd2a62dca08f654b',
+    messagingSenderId: '345903148434',
+    projectId: 'menu2go-fb7de',
+    storageBucket: 'menu2go-fb7de.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBgAzuMGyLMDVs-yc6Z6ATecOmx4_B9uNw',
-    appId: '1:699002286605:ios:d02ea2ec9cf8c8ae59db44',
-    messagingSenderId: '699002286605',
-    projectId: 'selection-admin',
-    storageBucket: 'selection-admin.firebasestorage.app',
-    androidClientId: '699002286605-9ms8hsbev6mfbd5ss724rmai84bk4ikn.apps.googleusercontent.com',
-    iosClientId: '699002286605-mj636am0m7lt2hr2ra0gs859sem6kaao.apps.googleusercontent.com',
+    apiKey: 'AIzaSyAcoL7dOxVmdJ3YqShpW_pfI4x0_cmHmXw',
+    appId: '1:345903148434:ios:8805b6c5400b044e8f654b',
+    messagingSenderId: '345903148434',
+    projectId: 'menu2go-fb7de',
+    storageBucket: 'menu2go-fb7de.firebasestorage.app',
     iosBundleId: 'com.menu2go.expressapp',
   );
 

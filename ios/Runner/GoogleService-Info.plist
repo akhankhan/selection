@@ -2,24 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>699002286605-mj636am0m7lt2hr2ra0gs859sem6kaao.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.699002286605-mj636am0m7lt2hr2ra0gs859sem6kaao</string>
-	<key>ANDROID_CLIENT_ID</key>
-	<string>699002286605-9ms8hsbev6mfbd5ss724rmai84bk4ikn.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyBgAzuMGyLMDVs-yc6Z6ATecOmx4_B9uNw</string>
+	<string>AIzaSyAcoL7dOxVmdJ3YqShpW_pfI4x0_cmHmXw</string>
 	<key>GCM_SENDER_ID</key>
-	<string>699002286605</string>
+	<string>345903148434</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.menu2go.expressapp</string>
 	<key>PROJECT_ID</key>
-	<string>selection-admin</string>
+	<string>menu2go-fb7de</string>
 	<key>STORAGE_BUCKET</key>
-	<string>selection-admin.firebasestorage.app</string>
+	<string>menu2go-fb7de.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -31,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:699002286605:ios:d02ea2ec9cf8c8ae59db44</string>
+	<string>1:345903148434:ios:8805b6c5400b044e8f654b</string>
 </dict>
 </plist>

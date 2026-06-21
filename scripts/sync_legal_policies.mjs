@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 
 initializeApp({
   credential: applicationDefault(),
-  projectId: 'selection-admin',
+  projectId: 'menu2go-fb7de',
 });
 
 const db = getFirestore();

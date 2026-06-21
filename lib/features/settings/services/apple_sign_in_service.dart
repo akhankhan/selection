@@ -30,7 +30,7 @@ class AppleSignInService {
               'Open Authentication → Sign-in method → Apple and turn it on.';
         case 'invalid-credential':
           return 'Apple credentials were rejected by Firebase. '
-              'Check that Apple Sign-In is enabled for project selection-admin.';
+              'Check that Apple Sign-In is enabled for project menu2go-fb7de.';
         case 'account-exists-with-different-credential':
           return 'An account already exists with this email using a different sign-in method.';
         case 'network-request-failed':

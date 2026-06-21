@@ -12,7 +12,7 @@ class SharedListService {
 
   static final SharedListService instance = SharedListService._();
 
-  static const inviteBaseUrl = 'https://selection-admin.web.app/join';
+  static const inviteBaseUrl = 'https://menu2go-fb7de.web.app/join';
 
   String _generateInviteCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

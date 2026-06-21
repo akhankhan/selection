@@ -34,7 +34,7 @@ class LegalDocuments {
     required this.supportEmail,
   });
 
-  static const String hostingBase = 'https://selection-admin.web.app';
+  static const String hostingBase = 'https://menu2go-fb7de.web.app';
 
   static const LegalDocuments defaults = LegalDocuments(
     termsOfServiceUrl: '$hostingBase/terms-of-service.html',

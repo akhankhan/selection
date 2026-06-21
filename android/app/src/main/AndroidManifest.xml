@@ -33,7 +33,7 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data
                     android:scheme="https"
-                    android:host="selection-admin.web.app"
+                    android:host="menu2go-fb7de.web.app"
                     android:pathPrefix="/join"/>
             </intent-filter>
             <intent-filter>
