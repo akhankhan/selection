@@ -135,11 +135,7 @@ class Menu2GoSplashAnimationState extends State<Menu2GoSplashAnimation>
                         math.cos(ambient) * 0.06 - 0.05,
                       ),
                       radius: 1.15,
-                      colors: const [
-                        brandPinkGlow,
-                        brandPink,
-                        brandPinkDeep,
-                      ],
+                      colors: const [brandPinkGlow, brandPink, brandPinkDeep],
                       stops: const [0.0, 0.55, 1.0],
                     ),
                   ),
@@ -223,10 +219,7 @@ class Menu2GoSplashAnimationState extends State<Menu2GoSplashAnimation>
 }
 
 class _LogoGlow extends StatelessWidget {
-  const _LogoGlow({
-    required this.glowStrength,
-    required this.child,
-  });
+  const _LogoGlow({required this.glowStrength, required this.child});
 
   final double glowStrength;
   final Widget child;

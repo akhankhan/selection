@@ -41,9 +41,9 @@ class _AppLaunchScreenState extends State<AppLaunchScreen> {
     await Menu2GoSplashAnimation.playExit(_splashKey);
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => nextScreen),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute<void>(builder: (_) => nextScreen));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppNavigator.handlePendingInviteIfAny();
     });
