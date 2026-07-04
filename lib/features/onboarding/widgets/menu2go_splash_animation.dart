@@ -151,13 +151,9 @@ class Menu2GoSplashAnimationState extends State<Menu2GoSplashAnimation>
                           scale: _logoScale.value * pulse,
                           child: Opacity(
                             opacity: _logoOpacity.value,
-                            child: _LogoGlow(
+                            child: _CircularLogoBadge(
                               glowStrength: _pulseController.value,
-                              child: Image.asset(
-                                'assets/branding/app_logo_mark.png',
-                                width: 220,
-                                fit: BoxFit.contain,
-                              ),
+                              size: 172,
                             ),
                           ),
                         ),
@@ -218,25 +214,43 @@ class Menu2GoSplashAnimationState extends State<Menu2GoSplashAnimation>
   }
 }
 
-class _LogoGlow extends StatelessWidget {
-  const _LogoGlow({required this.glowStrength, required this.child});
+class _CircularLogoBadge extends StatelessWidget {
+  const _CircularLogoBadge({
+    required this.glowStrength,
+    required this.size,
+  });
 
   final double glowStrength;
-  final Widget child;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
+    return Container(
+      width: size,
+      height: size,
       decoration: BoxDecoration(
+        shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.white.withValues(alpha: 0.18 + glowStrength * 0.12),
-            blurRadius: 28 + glowStrength * 10,
-            spreadRadius: 2,
+            color: Colors.white.withValues(alpha: 0.24 + glowStrength * 0.16),
+            blurRadius: 36 + glowStrength * 14,
+            spreadRadius: 8,
+          ),
+          BoxShadow(
+            color: brandPinkDeep.withValues(alpha: 0.4),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: child,
+      child: ClipOval(
+        child: Image.asset(
+          'assets/branding/app_logo_circle.png',
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+        ),
+      ),
     );
   }
 }

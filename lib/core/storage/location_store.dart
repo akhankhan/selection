@@ -32,9 +32,18 @@ class LocationStore extends ChangeNotifier {
   }
 
   List<Store> filterStores(List<Store> stores) {
-    return stores.where((store) => store.matchesPostal(_postal)).toList();
+    return stores
+        .where((store) => store.isEnabled)
+        .where((store) => store.hasMenuContent)
+        .where((store) => store.matchesPostal(_postal))
+        .toList();
   }
 
-  /// How many stores were hidden by the current postal filter.
-  int hiddenCount(List<Store> stores) => stores.length - filterStores(stores).length;
+  /// Stores hidden only because of the current postal code (for location snackbar).
+  int hiddenByLocationCount(List<Store> stores) {
+    return stores
+        .where((s) => s.isEnabled && s.hasMenuContent)
+        .where((s) => !s.matchesPostal(_postal))
+        .length;
+  }
 }

@@ -21,11 +21,13 @@ service cloud.firestore {
 
     match /stores/{storeId}/{document=**} {
       allow read: if true;
-      allow write: if false;
+      allow write: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null
+        && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     match /shared_lists/{listId} {
@@ -60,6 +62,10 @@ service cloud.firestore {
     match /legal_policies/{policyId} {
       allow read: if resource.data.isPublished == true || isAdmin();
       allow create, update, delete: if isAdmin();
+
+      match /versions/{versionId} {
+        allow read, write: if isAdmin();
+      }
     }
 
     match /audit_logs/{logId} {
@@ -70,7 +76,13 @@ service cloud.firestore {
 
     match /store_requests/{requestId} {
       allow create: if validStoreRequest(request.resource.data);
-      allow read, update, delete: if false;
+      allow read, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /notification_broadcasts/{broadcastId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // conversationId == Firebase Auth uid (one thread per user)

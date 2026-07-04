@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/storage/location_store.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
@@ -17,6 +18,7 @@ import '../../settings/screens/help_support_screen.dart';
 import '../../settings/screens/my_cards_screen.dart';
 import '../../settings/screens/request_store_screen.dart';
 import 'edit_favorites_screen.dart';
+import '../widgets/featured_store_card.dart';
 import '../widgets/store_card.dart';
 import '../widgets/search_tab_view.dart';
 
@@ -313,6 +315,81 @@ class _BrowseScreenState extends State<BrowseScreen> {
     );
   }
 
+  void _openStoreEntry(Store store, List<Store> stores) {
+    final index = stores.indexWhere((s) => s.id == store.id);
+    if (index >= 0) _openStore(stores, index);
+  }
+
+  List<Widget> _mixedStoreSlivers({
+    required List<Store> stores,
+    required bool isPageActive,
+  }) {
+    final featured = stores.where((s) => s.isFeatured).toList();
+    final standard = stores.where((s) => !s.isFeatured).toList();
+    final slivers = <Widget>[];
+
+    for (var i = 0; i < featured.length; i++) {
+      final store = featured[i];
+      slivers.add(
+        SliverPadding(
+          padding: EdgeInsets.fromLTRB(16, i == 0 ? 8 : 0, 16, 14),
+          sliver: SliverToBoxAdapter(
+            child: StaggeredGridEntry(
+              key: ValueKey('${store.id}_feat_${isPageActive ? "on" : "off"}'),
+              index: i,
+              child: FeaturedStoreCard(
+                store: store,
+                isFavorited: FavoritesStore.instance.contains(store.id),
+                onFavoriteToggle: () {
+                  FavoritesStore.instance.toggle(store.id);
+                },
+                onTap: () => _openStoreEntry(store, stores),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (standard.isNotEmpty) {
+      slivers.add(
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.74,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                final store = standard[i];
+                return StaggeredGridEntry(
+                  key: ValueKey(
+                    '${store.id}_std_${isPageActive ? "on" : "off"}',
+                  ),
+                  index: featured.length + i,
+                  child: StoreCard(
+                    store: store,
+                    isFavorited: FavoritesStore.instance.contains(store.id),
+                    onFavoriteToggle: () {
+                      FavoritesStore.instance.toggle(store.id);
+                    },
+                    onTap: () => _openStoreEntry(store, stores),
+                  ),
+                );
+              },
+              childCount: standard.length,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
   void _activateSearch() {
     setState(() => _bottomNavIndex = 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -417,7 +494,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     Navigator.pop(sheetContext);
 
                     final hidden =
-                        LocationStore.instance.hiddenCount(_allStores);
+                        LocationStore.instance.hiddenByLocationCount(_allStores);
                     final postal = LocationStore.instance.postal;
                     final message = hidden > 0
                         ? 'Location set to $postal. $hidden store${hidden == 1 ? '' : 's'} not in this area.'
@@ -457,15 +534,8 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final appBarTheme = Theme.of(context).appBarTheme;
-    final systemOverlay =
-        appBarTheme.systemOverlayStyle ??
-        (context.isDarkMode
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark);
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: systemOverlay,
+      value: AppTheme.systemOverlayFor(Theme.of(context).brightness),
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: _buildAppBar(),
@@ -944,31 +1014,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 sliver: SliverToBoxAdapter(child: _inlineEmpty('No upcoming flyers')),
               )
             else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.74,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => StaggeredGridEntry(
-                      key: ValueKey('${upcoming[i].id}_${isPageActive ? "active" : "inactive"}'),
-                      index: i,
-                      child: StoreCard(
-                        store: upcoming[i],
-                        isFavorited: FavoritesStore.instance.contains(upcoming[i].id),
-                        onFavoriteToggle: () {
-                          FavoritesStore.instance.toggle(upcoming[i].id);
-                        },
-                        onTap: () => _openStore(upcoming, i),
-                      ),
-                    ),
-                    childCount: upcoming.length,
-                  ),
-                ),
+              ..._mixedStoreSlivers(
+                stores: upcoming,
+                isPageActive: isPageActive,
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             SliverToBoxAdapter(child: _sectionHeader('New This Week')),
@@ -978,31 +1026,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 sliver: SliverToBoxAdapter(child: _inlineEmpty('Nothing new this week')),
               )
             else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.74,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => StaggeredGridEntry(
-                      key: ValueKey('${newThisWeek[i].id}_${isPageActive ? "active" : "inactive"}'),
-                      index: i,
-                      child: StoreCard(
-                        store: newThisWeek[i],
-                        isFavorited: FavoritesStore.instance.contains(newThisWeek[i].id),
-                        onFavoriteToggle: () {
-                          FavoritesStore.instance.toggle(newThisWeek[i].id);
-                        },
-                        onTap: () => _openStore(newThisWeek, i),
-                      ),
-                    ),
-                    childCount: newThisWeek.length,
-                  ),
-                ),
+              ..._mixedStoreSlivers(
+                stores: newThisWeek,
+                isPageActive: isPageActive,
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
@@ -1022,32 +1048,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 103.0)),
             SliverToBoxAdapter(child: _sectionHeader(headerLabel)),
             const SliverToBoxAdapter(child: SizedBox(height: 4)),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 0.74,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => StaggeredGridEntry(
-                    key: ValueKey('${stores[i].id}_${isPageActive ? "active" : "inactive"}'),
-                    index: i,
-                    child: StoreCard(
-                      store: stores[i],
-                      isFavorited: FavoritesStore.instance.contains(stores[i].id),
-                      onFavoriteToggle: () {
-                        FavoritesStore.instance.toggle(stores[i].id);
-                      },
-                      onTap: () => _openStore(stores, i),
-                    ),
-                  ),
-                  childCount: stores.length,
-                ),
-              ),
-            ),
+            ..._mixedStoreSlivers(stores: stores, isPageActive: isPageActive),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         );

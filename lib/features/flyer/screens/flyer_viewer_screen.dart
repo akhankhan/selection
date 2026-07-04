@@ -11,6 +11,7 @@ import '../../../core/storage/favorites_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
+import '../../browse/widgets/store_logo_avatar.dart';
 
 /// Render width (in CSS pixels) we ask Cloudinary to serve for a full-size
 /// flyer page. Anything below this is upscaled at decode time by the GPU;
@@ -604,18 +605,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: store.brandColor,
-                radius: 22,
-                child: Text(
-                  store.logoLetter,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+              StoreLogoAvatar(store: store, radius: 22, fontSize: 16),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -949,18 +939,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: store.brandColor,
-                  radius: 20,
-                  child: Text(
-                    store.logoLetter,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
+                StoreLogoAvatar(store: store, radius: 20, fontSize: 18),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

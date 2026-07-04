@@ -1,9 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
-import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/models/store.dart';
+import 'store_card_preview_image.dart';
 
 enum CardStatus { newBadge, untilText, previewBadge, expiringText }
 
@@ -26,44 +25,8 @@ class StoreCard extends StatelessWidget {
     final theme = context.appTheme;
     final isDark = context.isDarkMode;
 
-    final String imageUrl = store.pages.isNotEmpty
-        ? store.pages.first.imageUrl
-        : '';
-
     // Determine status badge based on store dates or mockup values matching the screenshots
-    Widget statusWidget = const SizedBox.shrink();
-    if (store.name.toLowerCase().contains('shoppers')) {
-      statusWidget = _buildStatusBadge(
-        'Preview',
-        const Color(0xFFE8F5E9),
-        const Color(0xFF2E7D32),
-      );
-    } else if (store.name.toLowerCase().contains('petsmart')) {
-      statusWidget = _buildStatusBadge(
-        'Ends Today',
-        const Color(0xFFFFEBEE),
-        const Color(0xFFC62828),
-      );
-    } else if (store.name.toLowerCase().contains('staples') ||
-        store.name.toLowerCase().contains('powell')) {
-      statusWidget = _buildStatusBadge(
-        'New',
-        const Color(0xFFE0F2FE),
-        const Color(0xFF0071CE),
-      );
-    } else {
-      // Default standard date range text
-      statusWidget = Text(
-        store.dateRange,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: theme.subtitle,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      );
-    }
+    final statusWidget = StoreCardStatusLine(store: store);
 
     return Container(
       decoration: BoxDecoration(
@@ -125,53 +88,7 @@ class StoreCard extends StatelessWidget {
 
               // Flyer Image content
               Expanded(
-                child: Container(
-                  width: double.infinity,
-                  color: theme.sectionBg,
-                  child: imageUrl.isEmpty
-                      ? Center(
-                          child: Icon(
-                            Icons.image_outlined,
-                            size: 32,
-                            color: theme.subtitle,
-                          ),
-                        )
-                      : LayoutBuilder(
-                          builder: (ctx, c) {
-                            final double dpr =
-                                MediaQuery.of(ctx).devicePixelRatio;
-                            final int targetW =
-                                (c.maxWidth * dpr).clamp(200, 800).toInt();
-                            return CachedNetworkImage(
-                              imageUrl: CloudinaryUrl.sized(
-                                imageUrl,
-                                width: targetW,
-                              ),
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topCenter,
-                              memCacheWidth: targetW,
-                              fadeInDuration: const Duration(milliseconds: 120),
-                              placeholder: (_, _) => Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: context.brandBlue,
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (_, _, _) => Center(
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 24,
-                                  color: theme.subtitle,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
+                child: StoreCardPreviewImage(store: store),
               ),
             ],
           ),
@@ -180,17 +97,51 @@ class StoreCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusBadge(String text, Color bgColor, Color fgColor) {
+}
+
+class StoreCardStatusLine extends StatelessWidget {
+  const StoreCardStatusLine({super.key, required this.store});
+
+  final Store store;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.appTheme;
+    final name = store.name.toLowerCase();
+
+    if (name.contains('shoppers')) {
+      return _badge('Preview', const Color(0xFFE8F5E9), const Color(0xFF2E7D32));
+    }
+    if (name.contains('petsmart')) {
+      return _badge('Ends Today', const Color(0xFFFFEBEE), const Color(0xFFC62828));
+    }
+    if (name.contains('staples') || name.contains('powell')) {
+      return _badge('New', const Color(0xFFE0F2FE), const Color(0xFF0071CE));
+    }
+
+    return Text(
+      store.dateRange,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: theme.subtitle,
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _badge(String text, Color bg, Color fg) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: bg,
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: fgColor,
+          color: fg,
           fontSize: 10.5,
           fontWeight: FontWeight.bold,
         ),

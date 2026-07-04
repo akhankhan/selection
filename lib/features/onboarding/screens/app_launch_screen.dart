@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/services/analytics_service.dart';
@@ -51,9 +52,18 @@ class _AppLaunchScreenState extends State<AppLaunchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: brandPink,
-      body: Menu2GoSplashAnimation(key: _splashKey),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: brandPink,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: brandPink,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: brandPink,
+        body: Menu2GoSplashAnimation(key: _splashKey),
+      ),
     );
   }
 }

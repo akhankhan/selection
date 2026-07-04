@@ -12,6 +12,25 @@ class AppTheme {
   static const Color _darkCard = Color(0xFF252525);
   static const Color _darkOnSurface = Color(0xFFE8EAED);
 
+  static SystemUiOverlayStyle systemOverlayFor(Brightness brightness) {
+    if (brightness == Brightness.dark) {
+      return const SystemUiOverlayStyle(
+        statusBarColor: _darkSurface,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: _darkSurface,
+        systemNavigationBarIconBrightness: Brightness.light,
+      );
+    }
+    return const SystemUiOverlayStyle(
+      statusBarColor: Colors.white,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    );
+  }
+
   static ThemeData get light {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: brandBlue,
@@ -28,7 +47,7 @@ class AppTheme {
       appBarForeground: Colors.black,
       divider: const Color(0xFFEEEEEE),
       extension: AppThemeExtension.light,
-      systemOverlay: SystemUiOverlayStyle.dark,
+      systemOverlay: systemOverlayFor(Brightness.light),
     );
   }
 
@@ -55,7 +74,7 @@ class AppTheme {
       appBarForeground: _darkOnSurface,
       divider: const Color(0xFF3C3C3C),
       extension: AppThemeExtension.dark,
-      systemOverlay: SystemUiOverlayStyle.light,
+      systemOverlay: systemOverlayFor(Brightness.dark),
     );
   }
 

@@ -6,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'core/navigation/app_navigator.dart';
@@ -131,6 +132,12 @@ class _MyAppState extends State<MyApp> {
           themeMode: ThemeController.instance.themeMode,
           themeAnimationDuration: const Duration(milliseconds: 250),
           themeAnimationCurve: Curves.easeInOut,
+          builder: (context, child) {
+            SystemChrome.setSystemUIOverlayStyle(
+              AppTheme.systemOverlayFor(Theme.of(context).brightness),
+            );
+            return child ?? const SizedBox.shrink();
+          },
           home: const AppLaunchScreen(),
         );
       },

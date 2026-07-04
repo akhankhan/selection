@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
+import 'store_logo_avatar.dart';
 import '../models/search_filters.dart';
 import '../models/search_results.dart';
 import '../services/deals_search_service.dart';
@@ -295,16 +296,7 @@ class _SearchTabViewState extends State<SearchTabView> {
     if (index < 0) return const SizedBox.shrink();
 
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: store.brandColor,
-        child: Text(
-          store.logoLetter,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+      leading: StoreLogoAvatar(store: store, radius: 20),
       title: Text(
         store.name,
         style: TextStyle(

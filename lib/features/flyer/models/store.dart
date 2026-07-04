@@ -3,6 +3,18 @@ import 'package:flutter/material.dart';
 
 import 'flyer_item.dart';
 
+enum StoreCardLayout { standard, featured }
+
+extension StoreCardLayoutParsing on StoreCardLayout {
+  static StoreCardLayout fromFirestore(String? value) {
+    if (value == 'featured') return StoreCardLayout.featured;
+    return StoreCardLayout.standard;
+  }
+
+  String get firestoreValue =>
+      this == StoreCardLayout.featured ? 'featured' : 'standard';
+}
+
 class FlyerPage {
   final String id;
   final String imageUrl;
@@ -38,10 +50,32 @@ class Store {
   final String dateRange;
   final String logoLetter;
   final Color brandColor;
+  final String? logoUrl;
   final List<FlyerPage> pages;
 
   /// Canadian postal FSA prefixes (e.g. `A1A`, `M5V`). Empty = all areas.
   final List<String> serviceAreas;
+
+  /// Browse grid size — `featured` shows a full-width hero card.
+  final StoreCardLayout cardLayout;
+
+  /// Admin toggle — disabled stores are hidden from the consumer app.
+  final bool isEnabled;
+
+  bool get isFeatured => cardLayout == StoreCardLayout.featured;
+
+  /// At least one flyer page with an image — required to show in the app.
+  bool get hasMenuContent =>
+      pages.any((page) => page.imageUrl.trim().isNotEmpty);
+
+  /// First flyer page image for browse cards (menu/flyer only — not store logo).
+  String? get previewImageUrl {
+    for (final page in pages) {
+      final url = page.imageUrl.trim();
+      if (url.isNotEmpty) return url;
+    }
+    return null;
+  }
 
   static String postalFsa(String postal) {
     final cleaned = postal.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
@@ -62,7 +96,10 @@ class Store {
     required this.logoLetter,
     required this.brandColor,
     required this.pages,
+    this.logoUrl,
     this.serviceAreas = const [],
+    this.cardLayout = StoreCardLayout.standard,
+    this.isEnabled = true,
   });
 
   factory Store.fromDoc(
@@ -74,6 +111,7 @@ class Store {
     final serviceAreas = rawAreas == null
         ? const <String>[]
         : rawAreas.map((value) => value.toString()).toList();
+    final rawLogo = d['logoUrl'] as String?;
 
     return Store(
       id: doc.id,
@@ -81,8 +119,13 @@ class Store {
       dateRange: (d['dateRange'] as String?) ?? '',
       logoLetter: (d['logoLetter'] as String?) ?? '?',
       brandColor: Color((d['brandColor'] as int?) ?? 0xFF0071CE),
+      logoUrl: (rawLogo == null || rawLogo.isEmpty) ? null : rawLogo,
       pages: pages,
       serviceAreas: serviceAreas,
+      cardLayout: StoreCardLayoutParsing.fromFirestore(
+        d['cardLayout'] as String?,
+      ),
+      isEnabled: d['isEnabled'] is bool ? d['isEnabled'] as bool : true,
     );
   }
 }
