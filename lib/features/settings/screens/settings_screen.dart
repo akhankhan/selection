@@ -534,6 +534,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         backgroundColor: Colors.orange,
                       ),
                     );
+                  case PushRegistrationStatus.loginRequired:
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result.message ?? 'Sign in to enable notifications.',
+                        ),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
                 }
               }
             },

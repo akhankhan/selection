@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/account_sync_service.dart';
+import '../../features/flyer/models/store.dart';
+import 'location_store.dart';
 
 class FavoritesStore extends ChangeNotifier {
   FavoritesStore._();
@@ -58,6 +60,22 @@ class FavoritesStore extends ChangeNotifier {
       if (!preserved.contains(id)) preserved.add(id);
     }
     await setOrdered(preserved);
+  }
+
+  /// Removes favorites that are no longer visible in the app (hidden, no menu,
+  /// expired/upcoming, wrong area, or deleted).
+  Future<void> pruneForStores(List<Store> stores, {String? postal}) async {
+    final userPostal = postal ?? LocationStore.instance.postal;
+    final byId = {for (final s in stores) s.id: s};
+    final valid = <String>[];
+    for (final id in _orderedIds) {
+      final store = byId[id];
+      if (store != null && store.isVisibleForUser(userPostal)) {
+        valid.add(id);
+      }
+    }
+    if (valid.length == _orderedIds.length) return;
+    await setOrdered(valid);
   }
 
   Future<void> _save() async {

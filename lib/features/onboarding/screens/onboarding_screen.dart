@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/storage/onboarding_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../settings/services/push_notification_service.dart';
 import '../../browse/screens/browse_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -53,6 +56,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppNavigator.handlePendingInviteIfAny();
+      unawaited(
+        PushNotificationService.instance.schedulePermissionPromptWhenReady(),
+      );
     });
   }
 

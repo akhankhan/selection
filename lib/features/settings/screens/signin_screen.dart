@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../../../core/storage/notification_preferences_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../services/apple_sign_in_service.dart';
+import '../services/push_notification_service.dart';
 import '../widgets/legal_terms_footer.dart';
 import 'email_signin_screen.dart';
 
@@ -483,6 +487,18 @@ class SignInScreen extends StatelessWidget {
   /// updates the profile + lastSignInAt on subsequent sign-ins. The admin
   /// panel reads from this collection — without this, signed-in users do
   /// not appear in the admin Users screen.
+  Future<void> _afterSignInSuccess() async {
+    if (NotificationPreferencesStore.instance.enabled) {
+      unawaited(PushNotificationService.instance.syncTokenIfPermitted());
+      if (!await PushNotificationService.instance.isNotificationPermissionGranted()) {
+        PushNotificationService.instance.resetPromptSession();
+        unawaited(
+          PushNotificationService.instance.schedulePermissionPromptWhenReady(),
+        );
+      }
+    }
+  }
+
   Future<void> _upsertUserDoc(User? user) async {
     if (user == null) return;
     final ref = FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -496,11 +512,15 @@ class SignInScreen extends StatelessWidget {
       };
       if (!snap.exists) {
         profile['createdAt'] = FieldValue.serverTimestamp();
+        profile['notificationsEnabled'] =
+            NotificationPreferencesStore.instance.enabled;
         await ref.set(profile);
-        debugPrint('[Firestore] Created users/${user.uid}');
       } else {
         await ref.update(profile);
-        debugPrint('[Firestore] Updated users/${user.uid}');
+      }
+
+      if (NotificationPreferencesStore.instance.enabled) {
+        unawaited(PushNotificationService.instance.syncTokenIfPermitted());
       }
     } catch (e) {
       debugPrint('[Firestore] upsert failed: $e');
@@ -515,6 +535,8 @@ class SignInScreen extends StatelessWidget {
     if (signedIn == true && context.mounted) {
       final user = FirebaseAuth.instance.currentUser;
       Navigator.pop(context);
+      await _afterSignInSuccess();
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -560,6 +582,8 @@ class SignInScreen extends StatelessWidget {
 
       if (context.mounted) {
         Navigator.pop(context);
+        await _afterSignInSuccess();
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -660,6 +684,8 @@ class SignInScreen extends StatelessWidget {
 
       if (context.mounted) {
         Navigator.pop(context); // Dismiss SignInScreen bottom sheet
+        await _afterSignInSuccess();
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -672,13 +698,15 @@ class SignInScreen extends StatelessWidget {
     } catch (e) {
       _isLoading.value = false;
       debugPrint('[Google Sign-In ERROR] Exception occurred during authentication flow: $e');
-      debugPrint('[Google Sign-In ERROR] NOTE: If you get "No credentials available", you MUST add a Google account to your Android emulator settings (Settings -> Passwords & Accounts -> Add Account -> Google).');
-      
+
+      final message = _googleSignInErrorMessage(e);
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Google Sign-In failed: ${e.toString()}'),
+            content: Text(message),
             backgroundColor: Colors.red[800],
+            duration: const Duration(seconds: 6),
             action: SnackBarAction(
               label: 'OK',
               textColor: Colors.white,
@@ -688,6 +716,23 @@ class SignInScreen extends StatelessWidget {
         );
       }
     }
+  }
+
+  String _googleSignInErrorMessage(Object error) {
+    if (error is GoogleSignInException) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        return 'Google Sign-In was cancelled.';
+      }
+      final details = error.toString().toLowerCase();
+      if (details.contains('no credential') ||
+          details.contains('no credentials')) {
+        return 'No Google account found on this device. '
+            'On the emulator: Settings → Passwords & accounts → Add account → Google. '
+            'Then try again.';
+      }
+    }
+    return 'Google Sign-In failed. Uninstall the app, run flutter clean, rebuild, '
+        'and try again. If it still fails, add a Google account to the device.';
   }
 }
 

@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/storage/notification_preferences_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../services/push_notification_service.dart';
 
 class EmailSignInScreen extends StatefulWidget {
   const EmailSignInScreen({super.key});
@@ -42,9 +46,15 @@ class _EmailSignInScreenState extends State<EmailSignInScreen> {
       };
       if (!snap.exists) {
         profile['createdAt'] = FieldValue.serverTimestamp();
+        profile['notificationsEnabled'] =
+            NotificationPreferencesStore.instance.enabled;
         await ref.set(profile);
       } else {
         await ref.update(profile);
+      }
+
+      if (NotificationPreferencesStore.instance.enabled) {
+        unawaited(PushNotificationService.instance.syncTokenIfPermitted());
       }
     } catch (e) {
       debugPrint('[Firestore] upsert failed: $e');

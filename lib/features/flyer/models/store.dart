@@ -5,6 +5,8 @@ import 'flyer_item.dart';
 
 enum StoreCardLayout { standard, featured }
 
+enum StoreStatus { upcoming, active, expired, undated }
+
 extension StoreCardLayoutParsing on StoreCardLayout {
   static StoreCardLayout fromFirestore(String? value) {
     if (value == 'featured') return StoreCardLayout.featured;
@@ -51,6 +53,8 @@ class Store {
   final String logoLetter;
   final Color brandColor;
   final String? logoUrl;
+  final DateTime? effectiveStart;
+  final DateTime? effectiveEnd;
   final List<FlyerPage> pages;
 
   /// Canadian postal FSA prefixes (e.g. `A1A`, `M5V`). Empty = all areas.
@@ -77,6 +81,30 @@ class Store {
     return null;
   }
 
+  StoreStatus statusAt(DateTime now) {
+    if (effectiveStart == null && effectiveEnd == null) {
+      return StoreStatus.undated;
+    }
+    if (effectiveStart != null && now.isBefore(effectiveStart!)) {
+      return StoreStatus.upcoming;
+    }
+    if (effectiveEnd != null && now.isAfter(effectiveEnd!)) {
+      return StoreStatus.expired;
+    }
+    return StoreStatus.active;
+  }
+
+  /// Shown in app when enabled, has menu, and within effective dates.
+  bool get isVisibleInApp {
+    if (!isEnabled) return false;
+    if (!hasMenuContent) return false;
+    final status = statusAt(DateTime.now());
+    return status == StoreStatus.active || status == StoreStatus.undated;
+  }
+
+  bool isVisibleForUser(String userPostal) =>
+      isVisibleInApp && matchesPostal(userPostal);
+
   static String postalFsa(String postal) {
     final cleaned = postal.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
     return cleaned.length >= 3 ? cleaned.substring(0, 3) : cleaned;
@@ -97,6 +125,8 @@ class Store {
     required this.brandColor,
     required this.pages,
     this.logoUrl,
+    this.effectiveStart,
+    this.effectiveEnd,
     this.serviceAreas = const [],
     this.cardLayout = StoreCardLayout.standard,
     this.isEnabled = true,
@@ -112,6 +142,11 @@ class Store {
         ? const <String>[]
         : rawAreas.map((value) => value.toString()).toList();
     final rawLogo = d['logoUrl'] as String?;
+    DateTime? toDate(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is DateTime) return v;
+      return null;
+    }
 
     return Store(
       id: doc.id,
@@ -120,6 +155,8 @@ class Store {
       logoLetter: (d['logoLetter'] as String?) ?? '?',
       brandColor: Color((d['brandColor'] as int?) ?? 0xFF0071CE),
       logoUrl: (rawLogo == null || rawLogo.isEmpty) ? null : rawLogo,
+      effectiveStart: toDate(d['effectiveStart']),
+      effectiveEnd: toDate(d['effectiveEnd']),
       pages: pages,
       serviceAreas: serviceAreas,
       cardLayout: StoreCardLayoutParsing.fromFirestore(

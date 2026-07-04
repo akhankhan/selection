@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/storage/favorites_store.dart';
+import '../../../core/storage/location_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
@@ -16,6 +17,15 @@ class EditFavoritesScreen extends StatefulWidget {
 
 class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
   List<String> _orderedIds = [];
+  Object? _pruneSource;
+
+  void _schedulePrune(List<Store> stores) {
+    if (identical(_pruneSource, stores)) return;
+    _pruneSource = stores;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FavoritesStore.instance.pruneForStores(stores);
+    });
+  }
 
   @override
   void initState() {
@@ -71,13 +81,27 @@ class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          _schedulePrune(snap.data!);
+
           final storesById = {
             for (final store in snap.data!) store.id: store,
           };
+          final postal = LocationStore.instance.postal;
           final favorites = _orderedIds
               .where(storesById.containsKey)
               .map((id) => storesById[id]!)
+              .where((store) => store.isVisibleForUser(postal))
               .toList();
+
+          if (_orderedIds.isNotEmpty && favorites.isEmpty) {
+            return EmptyStateView(
+              icon: Icons.favorite_border,
+              title: 'No active favorites',
+              message:
+                  'Your saved stores are hidden or no longer available. '
+                  'Favorite stores again from Browse when they are live.',
+            );
+          }
 
           if (favorites.isEmpty) {
             return EmptyStateView(

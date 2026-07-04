@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'core/config/google_sign_in_config.dart';
 import 'core/navigation/app_navigator.dart';
 import 'core/services/account_sync_service.dart';
 import 'core/services/analytics_service.dart';
@@ -55,13 +56,19 @@ Future<void> main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
   await GoogleSignIn.instance.initialize(
-    serverClientId:
-        '699002286605-cr66fkq10usnoisphf6vmna1i62vo61a.apps.googleusercontent.com',
+    serverClientId: GoogleSignInConfig.serverClientId,
   );
   FirebaseAuth.instance.authStateChanges().listen((user) async {
     if (user == null) return;
     await _syncUserToFirestore(user);
     await AccountSyncService.instance.syncForUser(user);
+    unawaited(PushNotificationService.instance.syncTokenIfPermitted());
+    if (!await PushNotificationService.instance.isNotificationPermissionGranted()) {
+      PushNotificationService.instance.resetPromptSession();
+      unawaited(
+        PushNotificationService.instance.schedulePermissionPromptWhenReady(),
+      );
+    }
   });
   runApp(const MyApp());
 }
@@ -86,7 +93,7 @@ Future<void> _syncUserToFirestore(User? user) async {
       await ref.update(profile);
     }
     if (NotificationPreferencesStore.instance.enabled) {
-      unawaited(PushNotificationService.instance.registerForPush());
+      unawaited(PushNotificationService.instance.syncTokenIfPermitted());
     }
   } catch (e, stack) {
     debugPrint('[Firestore] user sync failed: $e');

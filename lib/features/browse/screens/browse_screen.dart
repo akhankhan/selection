@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ import '../../settings/screens/settings_screen.dart';
 import '../../settings/screens/help_support_screen.dart';
 import '../../settings/screens/my_cards_screen.dart';
 import '../../settings/screens/request_store_screen.dart';
+import '../../settings/services/push_notification_service.dart';
 import 'edit_favorites_screen.dart';
 import '../widgets/featured_store_card.dart';
 import '../widgets/store_card.dart';
@@ -64,6 +66,15 @@ class _BrowseScreenState extends State<BrowseScreen> {
   String? _filterCacheLocationId;
   List<Store> _allStores = const [];
   int _storeReloadToken = 0;
+  Object? _favoritesPruneSource;
+
+  void _scheduleFavoritesPrune(List<Store> stores) {
+    if (identical(_favoritesPruneSource, stores)) return;
+    _favoritesPruneSource = stores;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FavoritesStore.instance.pruneForStores(stores);
+    });
+  }
 
   void _retryStoreLoad() {
     FlyerRepository.instance.clearCache();
@@ -80,6 +91,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     LocationStore.instance.addListener(_onBrowseDataChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppNavigator.handlePendingInviteIfAny();
+      unawaited(
+        PushNotificationService.instance.schedulePermissionPromptWhenReady(),
+      );
     });
   }
 
@@ -577,6 +591,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
               );
             }
             _allStores = snap.data!;
+            _scheduleFavoritesPrune(_allStores);
             final stores = LocationStore.instance.filterStores(_allStores);
             if (_bottomNavIndex == 1) {
               return SearchTabView(
