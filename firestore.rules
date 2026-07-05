@@ -74,6 +74,20 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == deviceId;
     }
 
+    match /admin_alert_locks/{lockId} {
+      allow read: if isAuthorizedAdmin();
+      allow create: if isAuthorizedAdmin()
+        && !exists(/databases/$(database)/documents/admin_alert_locks/$(lockId));
+      allow update, delete: if false;
+    }
+
+    match /admin_notification_leader/{adminId} {
+      allow read: if isAuthorizedAdmin();
+      allow create, update: if isAuthorizedAdmin()
+        && request.auth.uid == adminId;
+      allow delete: if false;
+    }
+
     match /app_config/{docId} {
       allow read: if true;
       allow write: if isAdmin();
