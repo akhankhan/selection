@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/app_shimmer.dart';
 import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/models/store.dart';
 
@@ -53,15 +54,8 @@ class StoreCardPreviewImage extends StatelessWidget {
             height: double.infinity,
             memCacheWidth: targetW,
             fadeInDuration: const Duration(milliseconds: 120),
-            placeholder: (_, _) => Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: context.brandBlue,
-                ),
-              ),
+            placeholder: (ctx, _) => AppShimmer(
+              child: ColoredBox(color: AppShimmer.fillColor(ctx)),
             ),
             errorWidget: (_, _, _) => Center(
               child: Icon(

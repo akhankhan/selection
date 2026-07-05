@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/storage/notification_inbox_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/app_shimmer.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../settings/services/push_notification_service.dart';
@@ -99,7 +100,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         stream: NotificationRepository.instance.watchInbox(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return _LoadingList(appTheme: appTheme);
+            return const _LoadingList();
           }
           if (snapshot.hasError) {
             return ErrorStateView(
@@ -400,46 +401,24 @@ class _NotificationTile extends StatelessWidget {
 }
 
 class _LoadingList extends StatelessWidget {
-  const _LoadingList({required this.appTheme});
-
-  final AppThemeExtension appTheme;
+  const _LoadingList();
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _SkeletonBlock(appTheme: appTheme, height: 14, width: 72),
-        const SizedBox(height: 10),
-        _SkeletonBlock(appTheme: appTheme, height: 88),
-        const SizedBox(height: 18),
-        _SkeletonBlock(appTheme: appTheme, height: 14, width: 88),
-        const SizedBox(height: 10),
-        _SkeletonBlock(appTheme: appTheme, height: 88),
-      ],
-    );
-  }
-}
-
-class _SkeletonBlock extends StatelessWidget {
-  const _SkeletonBlock({
-    required this.appTheme,
-    required this.height,
-    this.width,
-  });
-
-  final AppThemeExtension appTheme;
-  final double height;
-  final double? width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width ?? double.infinity,
-      height: height,
-      decoration: BoxDecoration(
-        color: appTheme.searchFill,
-        borderRadius: BorderRadius.circular(12),
+    return AppShimmer(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: const [
+          AppShimmerBox(height: 14, width: 72, borderRadius: 6),
+          SizedBox(height: 10),
+          AppShimmerBox(height: 88, borderRadius: 12),
+          SizedBox(height: 18),
+          AppShimmerBox(height: 14, width: 88, borderRadius: 6),
+          SizedBox(height: 10),
+          AppShimmerBox(height: 88, borderRadius: 12),
+          SizedBox(height: 10),
+          AppShimmerBox(height: 88, borderRadius: 12),
+        ],
       ),
     );
   }

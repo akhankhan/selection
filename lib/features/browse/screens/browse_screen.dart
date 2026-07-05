@@ -23,6 +23,7 @@ import '../../settings/screens/my_cards_screen.dart';
 import '../../settings/screens/request_store_screen.dart';
 import '../../settings/services/push_notification_service.dart';
 import 'edit_favorites_screen.dart';
+import '../widgets/browse_loading_shimmer.dart';
 import '../widgets/featured_store_card.dart';
 import '../widgets/store_card.dart';
 import '../widgets/search_tab_view.dart';
@@ -570,25 +571,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
               );
             }
             if (!snap.hasData) {
-              return Column(
+              return Stack(
                 children: [
-                  Container(
-                    color: context.appTheme.headerSurface,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildSearchBar(),
-                        _buildCategoryTabs(),
-                        Divider(height: 1, color: Theme.of(context).dividerColor),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: context.brandBlue,
-                      ),
-                    ),
+                  const Positioned.fill(child: BrowseLoadingShimmer()),
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildFloatingHeader(),
                   ),
                 ],
               );

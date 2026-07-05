@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/storage/location_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/widgets/app_shimmer.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_state_view.dart';
 import '../../flyer/data/flyer_repository.dart';
@@ -78,7 +79,7 @@ class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
             );
           }
           if (!snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const _FavoritesLoadingShimmer();
           }
 
           _schedulePrune(snap.data!);
@@ -134,6 +135,79 @@ class _EditFavoritesScreenState extends State<EditFavoritesScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _FavoritesLoadingShimmer extends StatelessWidget {
+  const _FavoritesLoadingShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = AppShimmer.fillColor(context);
+    final theme = context.appTheme;
+
+    return AppShimmer(
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        itemCount: 6,
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        itemBuilder: (_, _) => Container(
+          height: 68,
+          decoration: BoxDecoration(
+            color: theme.cardSurface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: theme.border),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 14,
+                      width: 140,
+                      decoration: BoxDecoration(
+                        color: fill,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 11,
+                      width: 96,
+                      decoration: BoxDecoration(
+                        color: fill,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: fill,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
