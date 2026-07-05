@@ -20,6 +20,7 @@ import 'core/storage/auto_delete_preferences_store.dart';
 import 'core/storage/favorites_store.dart';
 import 'core/storage/location_store.dart';
 import 'core/storage/loyalty_cards_store.dart';
+import 'core/storage/notification_inbox_store.dart';
 import 'core/storage/notification_preferences_store.dart';
 import 'core/storage/onboarding_store.dart';
 import 'features/lists/models/shopping_list_manager.dart';
@@ -49,6 +50,7 @@ Future<void> main() async {
   await AutoDeletePreferencesStore.instance.load();
   await LoyaltyCardsStore.instance.load();
   await NotificationPreferencesStore.instance.load();
+  await NotificationInboxStore.instance.load();
   await ShoppingListManager.instance.load();
   await PushNotificationService.instance.initialize();
   FirebaseFirestore.instance.settings = const Settings(

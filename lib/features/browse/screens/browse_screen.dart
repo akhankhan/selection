@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/storage/location_store.dart';
+import '../../../core/storage/notification_inbox_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
@@ -14,6 +15,8 @@ import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
 import '../../flyer/screens/flyer_viewer_screen.dart';
 import '../../lists/screens/lists_screen.dart';
+import '../../notifications/data/notification_repository.dart';
+import '../../notifications/screens/notifications_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../settings/screens/help_support_screen.dart';
 import '../../settings/screens/my_cards_screen.dart';
@@ -751,9 +754,44 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ),
       ),
       actions: [
-        IconButton(
-          icon: Icon(Icons.search, color: colorScheme.onSurface, size: 26),
-          onPressed: _activateSearch,
+        ListenableBuilder(
+          listenable: NotificationInboxStore.instance,
+          builder: (context, _) {
+            return StreamBuilder(
+              stream: NotificationRepository.instance.watchInbox(),
+              builder: (context, snapshot) {
+                final unread = NotificationInboxStore.instance.unreadCountFor(
+                  snapshot.data ?? const [],
+                );
+                return Badge(
+                  isLabelVisible: unread > 0,
+                  offset: const Offset(2, -10),
+                  label: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  backgroundColor: const Color(0xFFEC3090),
+                  child: IconButton(
+                    icon: Icon(
+                      unread > 0
+                          ? Icons.notifications
+                          : Icons.notifications_outlined,
+                      color: colorScheme.onSurface,
+                      size: 26,
+                    ),
+                    tooltip: 'Notifications',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            );
+          },
         ),
         PopupMenuButton<String>(
           icon: Icon(

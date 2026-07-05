@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../core/storage/notification_inbox_store.dart';
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/storage/notification_preferences_store.dart';
 
@@ -34,6 +35,8 @@ class PushRegistrationResult {
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  await NotificationInboxStore.instance.load();
+  await NotificationInboxStore.instance.registerIncomingNotification();
 }
 
 class PushNotificationService {
@@ -71,7 +74,10 @@ class PushNotificationService {
       );
     }
 
-    FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+    FirebaseMessaging.onMessage.listen((message) async {
+      await NotificationInboxStore.instance.registerIncomingNotification();
+      await _showForegroundNotification(message);
+    });
 
     _messaging.onTokenRefresh.listen(_syncTokenToFirestore);
 
