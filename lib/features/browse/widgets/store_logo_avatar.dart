@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/models/store.dart';
 
 /// Store avatar — uploaded logo when available, otherwise letter + brand color.
@@ -23,10 +22,7 @@ class StoreLogoAvatar extends StatelessWidget {
     final logoUrl = store.logoUrl;
 
     if (logoUrl != null && logoUrl.isNotEmpty) {
-      final sized = CloudinaryUrl.sized(
-        logoUrl,
-        width: (radius * 2 * 2).round(),
-      );
+      final sized = logoUrl;
       return CircleAvatar(
         radius: radius,
         backgroundColor: store.brandColor.withValues(alpha: 0.12),

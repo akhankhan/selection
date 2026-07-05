@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/widgets/product_thumbnail.dart';
 
 /// Rebuilds a flyer product thumbnail from a remote page image URL after
@@ -49,7 +48,7 @@ class _FlyerListThumbnailState extends State<FlyerListThumbnail> {
     }
 
     try {
-      final url = CloudinaryUrl.sized(widget.imageUrl, width: 600);
+      final url = widget.imageUrl;
       final response = await http.get(Uri.parse(url));
       if (response.statusCode != 200) throw Exception('HTTP ${response.statusCode}');
 

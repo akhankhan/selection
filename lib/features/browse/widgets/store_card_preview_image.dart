@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/app_shimmer.dart';
-import '../../flyer/data/cloudinary_url.dart';
 import '../../flyer/models/store.dart';
 
 /// Flyer thumbnail for store cards — first menu page only.
@@ -42,7 +41,7 @@ class StoreCardPreviewImage extends StatelessWidget {
         final dpr = MediaQuery.of(ctx).devicePixelRatio;
         final targetW =
             (constraints.maxWidth * dpr).clamp(200, maxCacheWidth).toInt();
-        final sizedUrl = CloudinaryUrl.sized(imageUrl, width: targetW);
+        final sizedUrl = imageUrl;
 
         return ColoredBox(
           color: theme.sectionBg,

@@ -20,12 +20,14 @@ extension StoreCardLayoutParsing on StoreCardLayout {
 class FlyerPage {
   final String id;
   final String imageUrl;
+  final String? previewImageUrl;
   final double aspectRatio;
   final List<FlyerItem> items;
 
   const FlyerPage({
     required this.id,
     required this.imageUrl,
+    this.previewImageUrl,
     required this.aspectRatio,
     this.items = const [],
   });
@@ -37,9 +39,12 @@ class FlyerPage {
     final d = doc.data() ?? const <String, dynamic>{};
     final w = (d['imageWidth'] as num?)?.toDouble() ?? 1;
     final h = (d['imageHeight'] as num?)?.toDouble() ?? 1;
+    final rawPreview = (d['previewImageUrl'] as String?)?.trim();
     return FlyerPage(
       id: doc.id,
       imageUrl: (d['imageUrl'] as String?) ?? '',
+      previewImageUrl:
+          rawPreview == null || rawPreview.isEmpty ? null : rawPreview,
       aspectRatio: h == 0 ? 1.0 : w / h,
       items: items,
     );
@@ -75,6 +80,8 @@ class Store {
   /// First flyer page image for browse cards (menu/flyer only — not store logo).
   String? get previewImageUrl {
     for (final page in pages) {
+      final preview = page.previewImageUrl?.trim();
+      if (preview != null && preview.isNotEmpty) return preview;
       final url = page.imageUrl.trim();
       if (url.isNotEmpty) return url;
     }

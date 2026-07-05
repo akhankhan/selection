@@ -755,7 +755,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 );
                 return Badge(
                   isLabelVisible: unread > 0,
-                  offset: const Offset(2, -10),
+                  offset: const Offset(4, 2),
                   label: Text(
                     unread > 9 ? '9+' : '$unread',
                     style: const TextStyle(fontSize: 10),

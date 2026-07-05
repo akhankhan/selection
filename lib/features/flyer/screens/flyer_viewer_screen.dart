@@ -2,20 +2,18 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
-import '../data/cloudinary_url.dart';
 import '../models/flyer_item.dart';
 import '../models/store.dart';
 import '../widgets/hand_drawn_circle_painter.dart';
 import '../widgets/deal_sheet.dart';
+import '../widgets/progressive_flyer_image.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
 import '../../browse/widgets/store_logo_avatar.dart';
 
-/// Render width (in CSS pixels) we ask Cloudinary to serve for a full-size
-/// flyer page. Anything below this is upscaled at decode time by the GPU;
-/// anything above wastes bandwidth and memory for a phone display.
+/// Target decode width for a full-size flyer page on phone displays.
 const int _kFlyerPageWidth = 1100;
 
 class FlyerViewerScreen extends StatefulWidget {
@@ -52,7 +50,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   /// One draw-on animation controller per highlighted item.
   final Map<String, AnimationController> _highlightControllers = {};
 
-  /// Decoded flyer images keyed by the sized Cloudinary URL, used to crop
+  /// Decoded flyer images keyed by image URL, used to crop
   /// real product photos for the deal sheet. Lives behind a ValueNotifier so
   /// only widgets that actually need pixel data (the deal sheet, list
   /// thumbnails) rebuild when a new image finishes decoding.
@@ -62,8 +60,20 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   /// Pending decodes so swiping back to a store doesn't re-trigger work.
   final Set<String> _pendingImageUrls = {};
 
-  String _renderUrlForPage(FlyerPage page) =>
-      CloudinaryUrl.sized(page.imageUrl, width: _kFlyerPageWidth);
+  /// Flyer pages whose full image has finished loading (highlights wait).
+  final Set<String> _loadedFlyerPageKeys = {};
+
+  String _renderUrlForPage(FlyerPage page) => page.imageUrl;
+
+  String _flyerPageKey(int storeIdx, int pageIdx) =>
+      '${_stores[storeIdx].id}_$pageIdx';
+
+  void _markFlyerPageLoaded(int storeIdx, int pageIdx) {
+    final key = _flyerPageKey(storeIdx, pageIdx);
+    if (_loadedFlyerPageKeys.add(key) && mounted) {
+      setState(() {});
+    }
+  }
 
   // Height of the in-scroll tab bar; used to offset page calculations.
   static const double _tabBarHeight = 48;
@@ -485,7 +495,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           },
           child: ListView.builder(
             controller: _scrollControllers[storeIdx],
-            padding: EdgeInsets.zero,
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.paddingOf(context).bottom + 56,
+            ),
             physics: const BouncingScrollPhysics(),
             itemCount: showWeekly
                 ? (store.pages.isEmpty ? 2 : store.pages.length + 1)
@@ -592,7 +604,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final appTheme = context.appTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final thumbUrl = store.pages.isNotEmpty
-        ? CloudinaryUrl.sized(store.pages.first.imageUrl, width: 400)
+        ? store.pages.first.previewImageUrl ?? store.pages.first.imageUrl
         : null;
 
     return Material(
@@ -714,7 +726,6 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final FlyerPage page = _stores[storeIdx].pages[pageIdx];
     final double dpr = MediaQuery.of(context).devicePixelRatio;
     final int targetW = (width * dpr).clamp(400, _kFlyerPageWidth).toInt();
-    final String renderUrl = _renderUrlForPage(page);
     return SizedBox(
       width: width,
       height: height,
@@ -731,20 +742,20 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
               child: page.imageUrl.isEmpty
                   ? ColoredBox(color: context.appTheme.sectionBg)
                   : RepaintBoundary(
-                      child: CachedNetworkImage(
-                        imageUrl: renderUrl,
+                      child: ProgressiveFlyerImage(
+                        imageUrl: page.imageUrl,
+                        previewImageUrl: page.previewImageUrl,
+                        renderWidth: targetW,
                         fit: BoxFit.fill,
-                        memCacheWidth: targetW,
-                        fadeInDuration: const Duration(milliseconds: 120),
-                        placeholder: (_, _) =>
-                            const Center(child: CircularProgressIndicator()),
-                        errorWidget: (_, _, _) => const Center(
-                          child: Icon(Icons.broken_image_outlined, size: 48),
-                        ),
+                        onImageReady: () =>
+                            _markFlyerPageLoaded(storeIdx, pageIdx),
                       ),
                     ),
             ),
-            ..._buildHighlights(storeIdx, pageIdx, width, height),
+            if (_loadedFlyerPageKeys.contains(
+              _flyerPageKey(storeIdx, pageIdx),
+            ))
+              ..._buildHighlights(storeIdx, pageIdx, width, height),
           ],
         ),
       ),
