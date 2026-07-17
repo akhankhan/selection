@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/navigation/app_navigator.dart';
@@ -90,7 +89,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
     super.initState();
     _pageController = PageController(initialPage: _selectedCategory.value);
     _pageController.addListener(_onPageScroll);
-    _searchController.addListener(_onSearchTextChanged);
     FavoritesStore.instance.addListener(_onBrowseDataChanged);
     LocationStore.instance.addListener(_onBrowseDataChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -105,14 +103,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     if (mounted) setState(() {});
   }
 
-  void _onSearchTextChanged() {
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
     _pageController.removeListener(_onPageScroll);
-    _searchController.removeListener(_onSearchTextChanged);
     FavoritesStore.instance.removeListener(_onBrowseDataChanged);
     LocationStore.instance.removeListener(_onBrowseDataChanged);
     _pageController.dispose();
@@ -352,17 +345,14 @@ class _BrowseScreenState extends State<BrowseScreen> {
         SliverPadding(
           padding: EdgeInsets.fromLTRB(16, i == 0 ? 8 : 0, 16, 14),
           sliver: SliverToBoxAdapter(
-            child: StaggeredGridEntry(
-              key: ValueKey('${store.id}_feat_${isPageActive ? "on" : "off"}'),
-              index: i,
-              child: FeaturedStoreCard(
-                store: store,
-                isFavorited: FavoritesStore.instance.contains(store.id),
-                onFavoriteToggle: () {
-                  FavoritesStore.instance.toggle(store.id);
-                },
-                onTap: () => _openStoreEntry(store, stores),
-              ),
+            child: FeaturedStoreCard(
+              key: ValueKey('feat_${store.id}'),
+              store: store,
+              isFavorited: FavoritesStore.instance.contains(store.id),
+              onFavoriteToggle: () {
+                FavoritesStore.instance.toggle(store.id);
+              },
+              onTap: () => _openStoreEntry(store, stores),
             ),
           ),
         ),
@@ -383,22 +373,19 @@ class _BrowseScreenState extends State<BrowseScreen> {
             delegate: SliverChildBuilderDelegate(
               (context, i) {
                 final store = standard[i];
-                return StaggeredGridEntry(
-                  key: ValueKey(
-                    '${store.id}_std_${isPageActive ? "on" : "off"}',
-                  ),
-                  index: featured.length + i,
-                  child: StoreCard(
-                    store: store,
-                    isFavorited: FavoritesStore.instance.contains(store.id),
-                    onFavoriteToggle: () {
-                      FavoritesStore.instance.toggle(store.id);
-                    },
-                    onTap: () => _openStoreEntry(store, stores),
-                  ),
+                return StoreCard(
+                  key: ValueKey(store.id),
+                  store: store,
+                  isFavorited: FavoritesStore.instance.contains(store.id),
+                  onFavoriteToggle: () {
+                    FavoritesStore.instance.toggle(store.id);
+                  },
+                  onTap: () => _openStoreEntry(store, stores),
                 );
               },
               childCount: standard.length,
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: true,
             ),
           ),
         ),
@@ -570,7 +557,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 onRetry: _retryStoreLoad,
               );
             }
-            if (!snap.hasData) {
+            final bool isLoading =
+                snap.connectionState == ConnectionState.waiting ||
+                !snap.hasData;
+            if (isLoading) {
               return Stack(
                 children: [
                   const Positioned.fill(child: BrowseLoadingShimmer()),
@@ -679,14 +669,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
       );
     }
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 6.0, sigmaY: 6.0),
-        child: Container(
-          color: appTheme.headerSurface.withValues(alpha: 0.92),
-          child: RepaintBoundary(child: header),
-        ),
-      ),
+    return Container(
+      color: appTheme.headerSurface.withValues(alpha: 0.98),
+      child: RepaintBoundary(child: header),
     );
   }
 
@@ -875,18 +860,22 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 Icon(Icons.search, color: appTheme.subtitle, size: 22),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    _searchController.text.isEmpty
-                        ? 'Search deals and stores'
-                        : _searchController.text,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: _searchController.text.isEmpty
-                          ? appTheme.subtitle
-                          : appTheme.navyText,
-                      fontSize: 14,
-                    ),
+                  child: ListenableBuilder(
+                    listenable: _searchController,
+                    builder: (context, _) {
+                      final query = _searchController.text;
+                      return Text(
+                        query.isEmpty ? 'Search deals and stores' : query,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: query.isEmpty
+                              ? appTheme.subtitle
+                              : appTheme.navyText,
+                          fontSize: 14,
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -1048,6 +1037,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         final bool isPageActive = 2 == activeCategory;
         return CustomScrollView(
           physics: const BouncingScrollPhysics(),
+          cacheExtent: 600,
           slivers: [
             const SliverToBoxAdapter(child: SizedBox(height: 103.0)),
             SliverToBoxAdapter(child: _sectionHeader('Upcoming')),
@@ -1087,6 +1077,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
         final bool isPageActive = pageIndex == activeCategory;
         return CustomScrollView(
           physics: const BouncingScrollPhysics(),
+          cacheExtent: 600,
           slivers: [
             const SliverToBoxAdapter(child: SizedBox(height: 103.0)),
             SliverToBoxAdapter(child: _sectionHeader(headerLabel)),
@@ -1220,37 +1211,6 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ),
       ],
       ),
-    );
-  }
-}
-
-class StaggeredGridEntry extends StatelessWidget {
-  final int index;
-  final Widget child;
-
-  const StaggeredGridEntry({
-    super.key,
-    required this.index,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final int delayMs = (index % 6) * 50;
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 350 + delayMs),
-      curve: Curves.easeOutQuad,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset(0.0, (1.0 - value) * 16.0),
-            child: child,
-          ),
-        );
-      },
-      child: child,
     );
   }
 }

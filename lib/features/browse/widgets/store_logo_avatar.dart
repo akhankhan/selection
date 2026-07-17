@@ -22,16 +22,19 @@ class StoreLogoAvatar extends StatelessWidget {
     final logoUrl = store.logoUrl;
 
     if (logoUrl != null && logoUrl.isNotEmpty) {
-      final sized = logoUrl;
+      final cacheWidth =
+          (radius * 2 * MediaQuery.devicePixelRatioOf(context)).round();
       return CircleAvatar(
         radius: radius,
         backgroundColor: store.brandColor.withValues(alpha: 0.12),
         child: ClipOval(
           child: CachedNetworkImage(
-            imageUrl: sized,
+            imageUrl: logoUrl,
             width: radius * 2,
             height: radius * 2,
             fit: BoxFit.cover,
+            memCacheWidth: cacheWidth,
+            filterQuality: FilterQuality.low,
             placeholder: (_, _) => _letterFallback(letterSize),
             errorWidget: (_, _, _) => _letterFallback(letterSize),
           ),

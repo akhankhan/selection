@@ -1,12 +1,16 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' show ImageFilter;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
 
-/// Loads a flyer page with a blurred preview, then reveals the full image.
+/// Loads a flyer page: full menu visible immediately as a blurred low-res
+/// preview, then sharpens into the full-quality image.
+///
+/// Blur is applied only to the tiny decoded preview texture (not the full-res
+/// image), so scrolling stays smooth while the effect still reads clearly.
 class ProgressiveFlyerImage extends StatefulWidget {
   const ProgressiveFlyerImage({
     super.key,
@@ -29,10 +33,16 @@ class ProgressiveFlyerImage extends StatefulWidget {
 
 class _ProgressiveFlyerImageState extends State<ProgressiveFlyerImage>
     with SingleTickerProviderStateMixin {
+  static const Duration _revealDuration = Duration(milliseconds: 520);
+  static const double _initialBlurSigma = 14;
+
   late final AnimationController _revealController;
-  late final Animation<double> _blur;
-  late final Animation<double> _opacity;
+  late final Animation<double> _sharpOpacity;
+  late final Animation<double> _blurSigma;
+
+  ImageProvider? _fullProvider;
   bool _revealStarted = false;
+  bool _revealComplete = false;
   bool _readyNotified = false;
 
   @override
@@ -40,14 +50,21 @@ class _ProgressiveFlyerImageState extends State<ProgressiveFlyerImage>
     super.initState();
     _revealController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 550),
+      duration: _revealDuration,
     );
     final curve = CurvedAnimation(
       parent: _revealController,
       curve: Curves.easeOutCubic,
     );
-    _blur = Tween<double>(begin: 16, end: 0).animate(curve);
-    _opacity = Tween<double>(begin: 0.4, end: 1).animate(curve);
+    _sharpOpacity = curve;
+    _blurSigma = Tween<double>(begin: _initialBlurSigma, end: 0).animate(curve);
+    _revealController.addStatusListener(_onRevealStatus);
+  }
+
+  void _onRevealStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      setState(() => _revealComplete = true);
+    }
   }
 
   @override
@@ -56,21 +73,31 @@ class _ProgressiveFlyerImageState extends State<ProgressiveFlyerImage>
     if (oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.previewImageUrl != widget.previewImageUrl ||
         oldWidget.renderWidth != widget.renderWidth) {
-      _revealStarted = false;
-      _readyNotified = false;
-      _revealController.reset();
+      _resetForNewSource();
     }
+  }
+
+  void _resetForNewSource() {
+    _revealStarted = false;
+    _revealComplete = false;
+    _readyNotified = false;
+    _fullProvider = null;
+    _revealController.reset();
   }
 
   @override
   void dispose() {
+    _revealController.removeStatusListener(_onRevealStatus);
     _revealController.dispose();
     super.dispose();
   }
 
-  void _startReveal() {
-    if (_revealStarted) return;
-    _revealStarted = true;
+  void _onFullImageDecoded(ImageProvider provider) {
+    if (_revealStarted || !mounted) return;
+    setState(() {
+      _fullProvider = provider;
+      _revealStarted = true;
+    });
     _revealController.forward();
     if (!_readyNotified) {
       _readyNotified = true;
@@ -78,85 +105,108 @@ class _ProgressiveFlyerImageState extends State<ProgressiveFlyerImage>
     }
   }
 
+  int get _lowResWidth => math.min(200, widget.renderWidth);
+
   @override
   Widget build(BuildContext context) {
-    final previewUrl = widget.previewImageUrl?.trim();
-    final hasPreview = previewUrl != null && previewUrl.isNotEmpty;
-    final previewWidth = math.min(120, widget.renderWidth);
+    if (widget.imageUrl.isEmpty) {
+      return _basePlaceholder(context);
+    }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        if (hasPreview)
-          CachedNetworkImage(
-            imageUrl: previewUrl,
-            fit: widget.fit,
-            width: double.infinity,
-            height: double.infinity,
-            memCacheWidth: 96,
-            fadeInDuration: Duration.zero,
-            errorWidget: (_, _, _) => _blurBackdrop(context, previewWidth),
-          )
-        else
-          _blurBackdrop(context, previewWidth),
-        CachedNetworkImage(
-          imageUrl: widget.imageUrl,
-          fit: widget.fit,
-          width: double.infinity,
-          height: double.infinity,
-          memCacheWidth: widget.renderWidth,
-          fadeInDuration: Duration.zero,
-          placeholder: (_, _) => const SizedBox.shrink(),
-          imageBuilder: (context, imageProvider) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _startReveal();
-            });
-            return AnimatedBuilder(
-              animation: _revealController,
-              builder: (context, _) {
-                return Opacity(
-                  opacity: _opacity.value.clamp(0.0, 1.0),
-                  child: ImageFiltered(
-                    imageFilter: ImageFilter.blur(
-                      sigmaX: _blur.value,
-                      sigmaY: _blur.value,
-                    ),
-                    child: Image(
-                      image: imageProvider,
-                      fit: widget.fit,
-                      width: double.infinity,
-                      height: double.infinity,
-                      gaplessPlayback: true,
-                    ),
+    if (_revealComplete && _fullProvider != null) {
+      return Image(
+        image: _fullProvider!,
+        fit: widget.fit,
+        width: double.infinity,
+        height: double.infinity,
+        gaplessPlayback: true,
+        filterQuality: FilterQuality.medium,
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _revealController,
+      builder: (context, _) {
+        final blurSigma =
+            _revealStarted ? _blurSigma.value : _initialBlurSigma;
+        final sharpOpacity = _revealStarted ? _sharpOpacity.value : 0.0;
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ImageFiltered(
+              imageFilter: ImageFilter.blur(
+                sigmaX: blurSigma,
+                sigmaY: blurSigma,
+              ),
+              child: _buildLowResLayer(context),
+            ),
+            if (_fullProvider != null)
+              Opacity(
+                opacity: sharpOpacity,
+                child: Image(
+                  image: _fullProvider!,
+                  fit: widget.fit,
+                  width: double.infinity,
+                  height: double.infinity,
+                  gaplessPlayback: true,
+                  filterQuality: FilterQuality.medium,
+                ),
+              ),
+            if (!_revealStarted)
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.imageUrl,
+                    fit: widget.fit,
+                    memCacheWidth: widget.renderWidth,
+                    fadeInDuration: Duration.zero,
+                    placeholder: (_, _) => const SizedBox.shrink(),
+                    imageBuilder: (context, imageProvider) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _onFullImageDecoded(imageProvider);
+                      });
+                      return const SizedBox.shrink();
+                    },
+                    errorWidget: (_, _, _) => _errorState(context),
                   ),
-                );
-              },
-            );
-          },
-          errorWidget: (_, _, _) => _errorState(context),
-        ),
-      ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _blurBackdrop(BuildContext context, int previewWidth) {
+  Widget _buildLowResLayer(BuildContext context) {
+    final previewUrl = widget.previewImageUrl?.trim();
+    if (previewUrl != null && previewUrl.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: previewUrl,
+        fit: widget.fit,
+        width: double.infinity,
+        height: double.infinity,
+        memCacheWidth: _lowResWidth,
+        fadeInDuration: Duration.zero,
+        filterQuality: FilterQuality.low,
+        placeholder: (_, _) => _basePlaceholder(context),
+        errorWidget: (_, _, _) => _lowResFromFullUrl(context),
+      );
+    }
+    return _lowResFromFullUrl(context);
+  }
+
+  Widget _lowResFromFullUrl(BuildContext context) {
     return CachedNetworkImage(
       imageUrl: widget.imageUrl,
       fit: widget.fit,
       width: double.infinity,
       height: double.infinity,
-      memCacheWidth: previewWidth,
+      memCacheWidth: _lowResWidth,
       fadeInDuration: Duration.zero,
+      filterQuality: FilterQuality.low,
       placeholder: (_, _) => _basePlaceholder(context),
-      imageBuilder: (context, imageProvider) => ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Image(
-          image: imageProvider,
-          fit: widget.fit,
-          width: double.infinity,
-          height: double.infinity,
-        ),
-      ),
       errorWidget: (_, _, _) => _basePlaceholder(context),
     );
   }

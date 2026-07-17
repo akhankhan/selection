@@ -60,20 +60,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   /// Pending decodes so swiping back to a store doesn't re-trigger work.
   final Set<String> _pendingImageUrls = {};
 
-  /// Flyer pages whose full image has finished loading (highlights wait).
-  final Set<String> _loadedFlyerPageKeys = {};
-
   String _renderUrlForPage(FlyerPage page) => page.imageUrl;
-
-  String _flyerPageKey(int storeIdx, int pageIdx) =>
-      '${_stores[storeIdx].id}_$pageIdx';
-
-  void _markFlyerPageLoaded(int storeIdx, int pageIdx) {
-    final key = _flyerPageKey(storeIdx, pageIdx);
-    if (_loadedFlyerPageKeys.add(key) && mounted) {
-      setState(() {});
-    }
-  }
 
   // Height of the in-scroll tab bar; used to offset page calculations.
   static const double _tabBarHeight = 48;
@@ -121,7 +108,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     ];
     for (final i in targets) {
       if (i < 0 || i >= _stores.length) continue;
-      _loadStoreImages(_stores[i]);
+      final centerPage = i == _currentStore ? _currentPage : null;
+      _loadStoreImages(_stores[i], centerPageIndex: centerPage);
     }
   }
 
@@ -188,8 +176,19 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     }
   }
 
-  void _loadStoreImages(Store store) {
-    for (final page in store.pages) {
+  void _loadStoreImages(Store store, {int? centerPageIndex}) {
+    final pages = store.pages;
+    if (pages.isEmpty) return;
+
+    final int center = (centerPageIndex ?? 0).clamp(0, pages.length - 1);
+    final Set<int> indices = {};
+    for (int d = -1; d <= 1; d++) {
+      final i = center + d;
+      if (i >= 0 && i < pages.length) indices.add(i);
+    }
+
+    for (final i in indices) {
+      final page = pages[i];
       if (page.imageUrl.isEmpty) continue;
       final String url = _renderUrlForPage(page);
       if (_flyerImages.value.containsKey(url) ||
@@ -198,7 +197,10 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       }
       _pendingImageUrls.add(url);
       try {
-        final imageProvider = CachedNetworkImageProvider(url);
+        final imageProvider = ResizeImage(
+          CachedNetworkImageProvider(url),
+          width: _kFlyerPageWidth,
+        );
         final stream = imageProvider.resolve(ImageConfiguration.empty);
         late final ImageStreamListener listener;
         listener = ImageStreamListener(
@@ -499,6 +501,9 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
               bottom: MediaQuery.paddingOf(context).bottom + 56,
             ),
             physics: const BouncingScrollPhysics(),
+            cacheExtent: width * 2,
+            addAutomaticKeepAlives: false,
+            addRepaintBoundaries: true,
             itemCount: showWeekly
                 ? (store.pages.isEmpty ? 2 : store.pages.length + 1)
                 : (relatedStores.isEmpty ? 2 : relatedStores.length + 1),
@@ -558,6 +563,10 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     }
     if (newPage != _currentPage) {
       setState(() => _currentPage = newPage);
+      _loadStoreImages(
+        _stores[_currentStore],
+        centerPageIndex: newPage,
+      );
     }
   }
 
@@ -726,38 +735,18 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final FlyerPage page = _stores[storeIdx].pages[pageIdx];
     final double dpr = MediaQuery.of(context).devicePixelRatio;
     final int targetW = (width * dpr).clamp(400, _kFlyerPageWidth).toInt();
-    return SizedBox(
+    return _FlyerPageTile(
+      key: ValueKey('${storeIdx}_$pageIdx'),
+      page: page,
       width: width,
       height: height,
-      child: GestureDetector(
-        onTapUp: (details) => _handleTap(
-          details.localPosition,
-          storeIdx,
-          pageIdx,
-          Size(width, height),
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: page.imageUrl.isEmpty
-                  ? ColoredBox(color: context.appTheme.sectionBg)
-                  : RepaintBoundary(
-                      child: ProgressiveFlyerImage(
-                        imageUrl: page.imageUrl,
-                        previewImageUrl: page.previewImageUrl,
-                        renderWidth: targetW,
-                        fit: BoxFit.fill,
-                        onImageReady: () =>
-                            _markFlyerPageLoaded(storeIdx, pageIdx),
-                      ),
-                    ),
-            ),
-            if (_loadedFlyerPageKeys.contains(
-              _flyerPageKey(storeIdx, pageIdx),
-            ))
-              ..._buildHighlights(storeIdx, pageIdx, width, height),
-          ],
-        ),
+      targetW: targetW,
+      highlights: _buildHighlights(storeIdx, pageIdx, width, height),
+      onTapUp: (details) => _handleTap(
+        details.localPosition,
+        storeIdx,
+        pageIdx,
+        Size(width, height),
       ),
     );
   }
@@ -984,6 +973,78 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             child: Center(child: _buildDotPill()),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One flyer page tile — image-ready state is local so the parent screen
+/// doesn't rebuild the whole scroll tree when each page finishes loading.
+class _FlyerPageTile extends StatefulWidget {
+  const _FlyerPageTile({
+    super.key,
+    required this.page,
+    required this.width,
+    required this.height,
+    required this.targetW,
+    required this.highlights,
+    required this.onTapUp,
+  });
+
+  final FlyerPage page;
+  final double width;
+  final double height;
+  final int targetW;
+  final List<Widget> highlights;
+  final void Function(TapUpDetails details) onTapUp;
+
+  @override
+  State<_FlyerPageTile> createState() => _FlyerPageTileState();
+}
+
+class _FlyerPageTileState extends State<_FlyerPageTile> {
+  bool _imageLoaded = false;
+
+  @override
+  void didUpdateWidget(_FlyerPageTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.page.imageUrl != widget.page.imageUrl ||
+        oldWidget.page.previewImageUrl != widget.page.previewImageUrl) {
+      _imageLoaded = false;
+    }
+  }
+
+  void _onImageReady() {
+    if (!_imageLoaded && mounted) {
+      setState(() => _imageLoaded = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: GestureDetector(
+        onTapUp: widget.onTapUp,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: widget.page.imageUrl.isEmpty
+                  ? ColoredBox(color: context.appTheme.sectionBg)
+                  : RepaintBoundary(
+                      child: ProgressiveFlyerImage(
+                        imageUrl: widget.page.imageUrl,
+                        previewImageUrl: widget.page.previewImageUrl,
+                        renderWidth: widget.targetW,
+                        fit: BoxFit.fill,
+                        onImageReady: _onImageReady,
+                      ),
+                    ),
+            ),
+            if (_imageLoaded) ...widget.highlights,
+          ],
+        ),
       ),
     );
   }

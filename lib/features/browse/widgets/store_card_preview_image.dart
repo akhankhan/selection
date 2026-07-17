@@ -52,9 +52,19 @@ class StoreCardPreviewImage extends StatelessWidget {
             width: double.infinity,
             height: double.infinity,
             memCacheWidth: targetW,
-            fadeInDuration: const Duration(milliseconds: 120),
+            fadeInDuration: const Duration(milliseconds: 180),
+            filterQuality: FilterQuality.low,
             placeholder: (ctx, _) => AppShimmer(
-              child: ColoredBox(color: AppShimmer.fillColor(ctx)),
+              child: ColoredBox(
+                color: AppShimmer.fillColor(ctx),
+                child: Center(
+                  child: Icon(
+                    Icons.image_outlined,
+                    size: 36,
+                    color: theme.subtitle.withValues(alpha: 0.35),
+                  ),
+                ),
+              ),
             ),
             errorWidget: (_, _, _) => Center(
               child: Icon(

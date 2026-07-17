@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme_extension.dart';
@@ -36,6 +38,7 @@ class _SearchTabViewState extends State<SearchTabView> {
   List<String> _recentSearches = [];
   SearchResults _results = SearchResults.empty;
   SearchFilters _filters = SearchFilters.none;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -47,6 +50,7 @@ class _SearchTabViewState extends State<SearchTabView> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     widget.searchController.removeListener(_onQueryChanged);
     super.dispose();
   }
@@ -58,7 +62,11 @@ class _SearchTabViewState extends State<SearchTabView> {
   }
 
   void _onQueryChanged() {
-    _runSearch(widget.searchController.text);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      _runSearch(widget.searchController.text);
+    });
   }
 
   void _runSearch(String query) {

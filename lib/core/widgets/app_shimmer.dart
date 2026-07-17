@@ -9,16 +9,17 @@ class AppShimmer extends StatelessWidget {
 
   static Color fillColor(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? const Color(0xFF2B2B2B) : const Color(0xFFE4E7EB);
+    // Slightly lighter than cardSurface so bones read clearly on the shell.
+    return isDark ? const Color(0xFF3A3A3A) : const Color(0xFFE8EBF0);
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: isDark ? const Color(0xFF2B2B2B) : const Color(0xFFE4E7EB),
-      highlightColor: isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F7FA),
-      period: const Duration(milliseconds: 1300),
+      baseColor: isDark ? const Color(0xFF323232) : const Color(0xFFE0E4EA),
+      highlightColor: isDark ? const Color(0xFF505050) : const Color(0xFFF8FAFC),
+      period: const Duration(milliseconds: 1100),
       child: child,
     );
   }
