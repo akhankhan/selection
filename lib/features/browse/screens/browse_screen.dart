@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/storage/location_store.dart';
-import '../../../core/storage/notification_inbox_store.dart';
+// import '../../../core/storage/notification_inbox_store.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_theme_extension.dart';
 import '../../../core/widgets/empty_state_view.dart';
@@ -14,18 +15,23 @@ import '../../flyer/models/flyer_item.dart';
 import '../../flyer/models/store.dart';
 import '../../flyer/screens/flyer_viewer_screen.dart';
 import '../../lists/screens/lists_screen.dart';
-import '../../notifications/data/notification_repository.dart';
-import '../../notifications/screens/notifications_screen.dart';
+// import '../../notifications/data/notification_repository.dart';
+// import '../../notifications/screens/notifications_screen.dart';
 import '../../settings/screens/settings_screen.dart';
 import '../../settings/screens/help_support_screen.dart';
 import '../../settings/screens/my_cards_screen.dart';
 import '../../settings/screens/request_store_screen.dart';
 import '../../settings/services/push_notification_service.dart';
 import 'edit_favorites_screen.dart';
+import '../data/menu_category_repository.dart';
+import '../models/menu_category.dart';
+import '../utils/store_category_matcher.dart';
 import '../widgets/browse_loading_shimmer.dart';
 import '../widgets/featured_store_card.dart';
+import '../widgets/home_ad_banner.dart';
 import '../widgets/store_card.dart';
 import '../widgets/search_tab_view.dart';
+import '../models/home_ad.dart';
 
 class BrowseScreen extends StatefulWidget {
   const BrowseScreen({super.key});
@@ -35,24 +41,45 @@ class BrowseScreen extends StatefulWidget {
 }
 
 class _BrowseScreenState extends State<BrowseScreen> {
-  static const List<String> _categories = [
+  /// Fixed leading tabs. Food cuisine tabs follow from admin or fallback.
+  static const List<String> _fixedTabs = [
     'Favorites',
     'Explore',
     'Latest',
     'A-Z',
-    'Groceries',
-    'Restaurants',
-    'Home & Garden',
-    'Pharmacy',
-    'General Merchandise',
-    'Electronics',
-    'Automotive',
-    'Pets',
-    'Office',
-    'Specialty',
   ];
 
-  final ValueNotifier<int> _selectedCategory = ValueNotifier<int>(1);
+  /// Fallback cuisine tabs when Firestore `menu_categories` is empty.
+  static const List<String> _fallbackFoodCategories = [
+    'Burgers',
+    'Pizza',
+    'Asian',
+    'Mexican',
+    'Indian',
+    'Cafe',
+    'Chicken',
+    'Desserts',
+    'Seafood',
+    'Healthy',
+  ];
+
+  // Legacy non-food categories (removed from UI):
+  // 'Groceries', 'Restaurants', 'Home & Garden', 'Pharmacy',
+  // 'General Merchandise', 'Electronics', 'Automotive', 'Pets',
+  // 'Office', 'Specialty',
+
+  List<MenuCategory> _adminCategories = const [];
+  StreamSubscription<List<MenuCategory>>? _categorySub;
+
+  List<String> get _categories {
+    final foodNames = _adminCategories.isNotEmpty
+        ? _adminCategories.map((c) => c.name).toList()
+        : _fallbackFoodCategories;
+    return [..._fixedTabs, ...foodNames];
+  }
+
+  /// Default opening tab: A-Z so restaurants are listed alphabetically.
+  final ValueNotifier<int> _selectedCategory = ValueNotifier<int>(3);
   int _bottomNavIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -91,6 +118,17 @@ class _BrowseScreenState extends State<BrowseScreen> {
     _pageController.addListener(_onPageScroll);
     FavoritesStore.instance.addListener(_onBrowseDataChanged);
     LocationStore.instance.addListener(_onBrowseDataChanged);
+    _categorySub = MenuCategoryRepository.instance.watchEnabled().listen((cats) {
+      if (!mounted) return;
+      setState(() {
+        _adminCategories = cats;
+        _filterCache.clear();
+        final max = _categories.length - 1;
+        if (_selectedCategory.value > max) {
+          _selectedCategory.value = max.clamp(0, max);
+        }
+      });
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AppNavigator.handlePendingInviteIfAny();
       unawaited(
@@ -105,6 +143,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
   @override
   void dispose() {
+    _categorySub?.cancel();
     _pageController.removeListener(_onPageScroll);
     FavoritesStore.instance.removeListener(_onBrowseDataChanged);
     LocationStore.instance.removeListener(_onBrowseDataChanged);
@@ -119,8 +158,84 @@ class _BrowseScreenState extends State<BrowseScreen> {
   double _getTabWidth(int categoryIndex) {
     if (categoryIndex == 0) return 56.0;
     final name = _categories[categoryIndex];
-    // Approximate character width in pixels + horizontal padding of 24
-    return name.length * 8.5 + 24.0;
+    // Approximate character width + horizontal padding of 24 + icon (18) + gap (6)
+    return name.length * 8.5 + 24.0 + 24.0;
+  }
+
+  /// Small leading icon for a category tab — admin-uploaded icon for food
+  /// categories, built-in icons for the fixed tabs, emoji fallback otherwise.
+  Widget _categoryTabIcon(int categoryIndex, bool active) {
+    final Color color =
+        active ? context.brandBlue : context.appTheme.chipInactive;
+    switch (categoryIndex) {
+      case 1:
+        return Icon(Icons.explore_outlined, size: 17, color: color);
+      case 2:
+        return Icon(Icons.schedule_outlined, size: 17, color: color);
+      case 3:
+        return Icon(Icons.sort_by_alpha, size: 17, color: color);
+    }
+
+    // Food tabs: custom uploaded icon → admin-picked emoji → name fallback.
+    String? adminEmoji;
+    final foodIndex = categoryIndex - _fixedTabs.length;
+    if (foodIndex >= 0 && foodIndex < _adminCategories.length) {
+      final cat = _adminCategories[foodIndex];
+      adminEmoji = cat.emoji;
+      final iconUrl = cat.iconUrl;
+      if (iconUrl != null && iconUrl.isNotEmpty) {
+        return Opacity(
+          opacity: active ? 1.0 : 0.6,
+          child: ClipOval(
+            child: CachedNetworkImage(
+              imageUrl: iconUrl,
+              width: 18,
+              height: 18,
+              fit: BoxFit.cover,
+              memCacheWidth: 54,
+              fadeInDuration: Duration.zero,
+              errorWidget: (_, _, _) => Text(
+                adminEmoji ?? _categoryEmoji(_categories[categoryIndex]),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    return Opacity(
+      opacity: active ? 1.0 : 0.6,
+      child: Text(
+        adminEmoji ?? _categoryEmoji(_categories[categoryIndex]),
+        style: const TextStyle(fontSize: 13),
+      ),
+    );
+  }
+
+  static String _categoryEmoji(String name) {
+    switch (name.toLowerCase()) {
+      case 'burgers':
+        return '🍔';
+      case 'pizza':
+        return '🍕';
+      case 'asian':
+        return '🍜';
+      case 'mexican':
+        return '🌮';
+      case 'indian':
+        return '🍛';
+      case 'cafe':
+        return '☕';
+      case 'chicken':
+        return '🍗';
+      case 'desserts':
+        return '🍩';
+      case 'seafood':
+        return '🦞';
+      case 'healthy':
+        return '🥗';
+      default:
+        return '🍽️';
+    }
   }
 
   void _onPageScroll() {
@@ -147,6 +262,13 @@ class _BrowseScreenState extends State<BrowseScreen> {
         curve: Curves.easeInOut,
       );
     }
+  }
+
+  void _openCategoryFromAd(String categoryId) {
+    final foodIndex =
+        _adminCategories.indexWhere((c) => c.id == categoryId);
+    if (foodIndex < 0) return;
+    _selectCategory(_fixedTabs.length + foodIndex);
   }
 
   void _syncPageControllerToCategory() {
@@ -210,110 +332,41 @@ class _BrowseScreenState extends State<BrowseScreen> {
           .toList();
     }
     if (index == 1) {
-      return stores; // Explore: all stores
+      // Explore: all restaurants
+      return stores;
     }
     if (index == 2) {
       return stores; // Latest: handled separately with Upcoming & New
     }
     if (index == 3) {
-      // A-Z: all stores sorted alphabetically by name
+      // A-Z: all restaurants sorted alphabetically by name
       final list = List<Store>.from(stores);
       list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       return list;
     }
 
-    final category = _categories[index].toLowerCase();
+    final category = _categories[index];
+    final foodIndex = index - _fixedTabs.length;
+    final MenuCategory? adminCat =
+        foodIndex >= 0 && foodIndex < _adminCategories.length
+            ? _adminCategories[foodIndex]
+            : null;
+
     return stores.where((store) {
-      final name = store.name.toLowerCase();
-      if (category == 'groceries') {
-        return name.contains('grocer') ||
-            name.contains('market') ||
-            name.contains('supermarket') ||
-            name.contains('food') ||
-            name.contains('metro') ||
-            name.contains('sobeys') ||
-            name.contains('loblaw') ||
-            name.contains('costco') ||
-            name.contains('safeway') ||
-            name.contains('freshco') ||
-            name.contains('no frills') ||
-            name.contains('real canadian superstore') ||
-            name.contains('walmart') ||
-            name.contains('iga');
-      } else if (category == 'restaurants') {
-        return name.contains('restaurant') ||
-            name.contains('mcdonald') ||
-            name.contains('burger') ||
-            name.contains('pizza') ||
-            name.contains('subway') ||
-            name.contains('kfc') ||
-            name.contains('tim hortons') ||
-            name.contains('starbucks') ||
-            name.contains('wendy') ||
-            name.contains('taco');
-      } else if (category == 'home & garden') {
-        return name.contains('home') ||
-            name.contains('garden') ||
-            name.contains('depot') ||
-            name.contains('lowe') ||
-            name.contains('ikea') ||
-            name.contains('canadian tire') ||
-            name.contains('hardware') ||
-            name.contains('bed bath') ||
-            name.contains('renodepot') ||
-            name.contains('rona');
-      } else if (category == 'pharmacy') {
-        return name.contains('pharmacy') ||
-            name.contains('drug') ||
-            name.contains('shoppers') ||
-            name.contains('rexall') ||
-            name.contains('pharma') ||
-            name.contains('health') ||
-            name.contains('london drugs');
-      } else if (category == 'general merchandise') {
-        return name.contains('walmart') ||
-            name.contains('costco') ||
-            name.contains('target') ||
-            name.contains('dollarama') ||
-            name.contains('giant tiger') ||
-            name.contains('marshalls') ||
-            name.contains('winners');
-      } else if (category == 'electronics') {
-        return name.contains('electronic') ||
-            name.contains('best buy') ||
-            name.contains('apple') ||
-            name.contains('source') ||
-            name.contains('staples') ||
-            name.contains('cell') ||
-            name.contains('tbooster');
-      } else if (category == 'automotive') {
-        return name.contains('auto') ||
-            name.contains('tire') ||
-            name.contains('canadian tire') ||
-            name.contains('part') ||
-            name.contains('garage') ||
-            name.contains('napa');
-      } else if (category == 'pets') {
-        return name.contains('pet') ||
-            name.contains('animal') ||
-            name.contains('dog') ||
-            name.contains('cat') ||
-            name.contains('petsmart') ||
-            name.contains('pet valu');
-      } else if (category == 'office') {
-        return name.contains('office') ||
-            name.contains('staples') ||
-            name.contains('depot') ||
-            name.contains('ink') ||
-            name.contains('paper');
-      } else if (category == 'specialty') {
-        return !name.contains('grocer') &&
-            !name.contains('walmart') &&
-            !name.contains('sobeys') &&
-            !name.contains('shoppers') &&
-            !name.contains('home');
+      if (adminCat != null) {
+        if (store.categoryIds.isNotEmpty) {
+          return store.categoryIds.contains(adminCat.id);
+        }
+        if (adminCat.keywords.isNotEmpty) {
+          final name = store.name.toLowerCase();
+          return adminCat.keywords.any(name.contains);
+        }
       }
-      return false;
+      return StoreCategoryMatcher.matchesCategory(
+        store,
+        category,
+        categoryId: adminCat?.id,
+      );
     }).toList();
   }
 
@@ -616,8 +669,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
                         final filtered = _filterStoresByCategory(stores, index);
                         final String categoryName = _categories[index];
                         final String title = index == 1
-                            ? 'New This Week'
-                            : categoryName;
+                            ? 'Restaurants'
+                            : index == 3
+                                ? 'Restaurants A–Z'
+                                : categoryName;
                         if (index > 3 && filtered.isEmpty) {
                           return _buildEmptyCategory(categoryName);
                         }
@@ -711,7 +766,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Savings from:',
+                    'Pickup near:',
                     style: TextStyle(fontSize: 12, color: appTheme.subtitle),
                   ),
                   Text(
@@ -729,42 +784,40 @@ class _BrowseScreenState extends State<BrowseScreen> {
         ),
       ),
       actions: [
+        // Notifications bell replaced with Favorites heart (pickup/resto pivot).
+        // ListenableBuilder(
+        //   listenable: NotificationInboxStore.instance,
+        //   builder: (context, _) {
+        //     return StreamBuilder(
+        //       stream: NotificationRepository.instance.watchInbox(),
+        //       ...
+        //     );
+        //   },
+        // ),
         ListenableBuilder(
-          listenable: NotificationInboxStore.instance,
+          listenable: FavoritesStore.instance,
           builder: (context, _) {
-            return StreamBuilder(
-              stream: NotificationRepository.instance.watchInbox(),
-              builder: (context, snapshot) {
-                final unread = NotificationInboxStore.instance.unreadCountFor(
-                  snapshot.data ?? const [],
-                );
-                return Badge(
-                  isLabelVisible: unread > 0,
-                  offset: const Offset(4, 2),
-                  label: Text(
-                    unread > 9 ? '9+' : '$unread',
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  backgroundColor: const Color(0xFFEC3090),
-                  child: IconButton(
-                    icon: Icon(
-                      unread > 0
-                          ? Icons.notifications
-                          : Icons.notifications_outlined,
-                      color: colorScheme.onSurface,
-                      size: 26,
-                    ),
-                    tooltip: 'Notifications',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const NotificationsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
+            final count = FavoritesStore.instance.ids.length;
+            return Badge(
+              isLabelVisible: count > 0,
+              offset: const Offset(4, 2),
+              label: Text(
+                count > 9 ? '9+' : '$count',
+                style: const TextStyle(fontSize: 10),
+              ),
+              backgroundColor: const Color(0xFFEC3090),
+              child: IconButton(
+                icon: Icon(
+                  count > 0 ? Icons.favorite : Icons.favorite_border,
+                  color: colorScheme.onSurface,
+                  size: 26,
+                ),
+                tooltip: 'Favorites',
+                onPressed: () {
+                  setState(() => _bottomNavIndex = 0);
+                  _selectCategory(0);
+                },
+              ),
             );
           },
         ),
@@ -813,7 +866,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
             _popupItem('location', 'Change Location'),
             _popupItem('help', 'Help & Support'),
             _popupItem('cards', 'My Cards'),
-            _popupItem('request', 'Request a Store'),
+            _popupItem('request', 'Request a Restaurant'),
           ],
         ),
         const SizedBox(width: 4),
@@ -865,7 +918,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     builder: (context, _) {
                       final query = _searchController.text;
                       return Text(
-                        query.isEmpty ? 'Search deals and stores' : query,
+                        query.isEmpty ? 'Search restaurants and dishes' : query,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -965,18 +1018,26 @@ class _BrowseScreenState extends State<BrowseScreen> {
                           children: [
                             Expanded(
                               child: Center(
-                                child: AnimatedDefaultTextStyle(
-                                  duration: const Duration(milliseconds: 250),
-                                  style: TextStyle(
-                                    color: active
-                                        ? context.brandBlue
-                                        : appTheme.chipInactive,
-                                    fontWeight: active
-                                        ? FontWeight.w800
-                                        : FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                  child: Text(_categories[categoryIndex]),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _categoryTabIcon(categoryIndex, active),
+                                    const SizedBox(width: 6),
+                                    AnimatedDefaultTextStyle(
+                                      duration:
+                                          const Duration(milliseconds: 250),
+                                      style: TextStyle(
+                                        color: active
+                                            ? context.brandBlue
+                                            : appTheme.chipInactive,
+                                        fontWeight: active
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                      child: Text(_categories[categoryIndex]),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1011,11 +1072,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
         icon: Icons.favorite_border,
         title: 'No Favorites Yet',
         message:
-            'Tap the heart icon on any flyer to save it to your favorites list.',
-        actionLabel: 'Browse stores',
+            'Tap the heart on a restaurant to save it here for quick pickup menus.',
+        actionLabel: 'Browse restaurants',
         onAction: () {
-          _selectCategory(1);
-          _pageController.jumpToPage(1);
+          _selectCategory(3);
+          if (_pageController.hasClients) _pageController.jumpToPage(3);
         },
       ),
     );
@@ -1080,9 +1141,23 @@ class _BrowseScreenState extends State<BrowseScreen> {
           cacheExtent: 600,
           slivers: [
             const SliverToBoxAdapter(child: SizedBox(height: 103.0)),
+            SliverToBoxAdapter(
+              child: HomeAdBanner(
+                placement: HomeAdPlacement.homeTop,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                onOpenCategory: _openCategoryFromAd,
+              ),
+            ),
             SliverToBoxAdapter(child: _sectionHeader(headerLabel)),
             const SliverToBoxAdapter(child: SizedBox(height: 4)),
             ..._mixedStoreSlivers(stores: stores, isPageActive: isPageActive),
+            SliverToBoxAdapter(
+              child: HomeAdBanner(
+                placement: HomeAdPlacement.homeMid,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                onOpenCategory: _openCategoryFromAd,
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         );
@@ -1148,10 +1223,10 @@ class _BrowseScreenState extends State<BrowseScreen> {
     return Padding(
       padding: const EdgeInsets.only(top: 103.0),
       child: EmptyStateView(
-        icon: Icons.storefront_outlined,
-        title: 'No $categoryName flyers found',
+        icon: Icons.restaurant_outlined,
+        title: 'No $categoryName restaurants found',
         message:
-            'We update our flyers daily. Please check back later or try another category.',
+            'We add new menus often. Check back later or try another category.',
       ),
     );
   }
@@ -1198,18 +1273,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         elevation: 0,
         items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.local_offer_outlined),
-          activeIcon: Icon(Icons.local_offer),
-          label: 'Browse',
-        ),
-        BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.list_alt_outlined),
-          activeIcon: Icon(Icons.list_alt),
-          label: 'Lists',
-        ),
-      ],
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list_alt_outlined),
+            activeIcon: Icon(Icons.list_alt),
+            label: 'List',
+          ),
+        ],
       ),
     );
   }

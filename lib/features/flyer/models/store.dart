@@ -71,6 +71,9 @@ class Store {
   /// Admin toggle — disabled stores are hidden from the consumer app.
   final bool isEnabled;
 
+  /// Firestore `menu_categories` doc ids assigned in admin.
+  final List<String> categoryIds;
+
   bool get isFeatured => cardLayout == StoreCardLayout.featured;
 
   /// At least one flyer page with an image — required to show in the app.
@@ -137,6 +140,7 @@ class Store {
     this.serviceAreas = const [],
     this.cardLayout = StoreCardLayout.standard,
     this.isEnabled = true,
+    this.categoryIds = const [],
   });
 
   factory Store.fromDoc(
@@ -148,6 +152,10 @@ class Store {
     final serviceAreas = rawAreas == null
         ? const <String>[]
         : rawAreas.map((value) => value.toString()).toList();
+    final rawCats = d['categoryIds'] as List?;
+    final categoryIds = rawCats == null
+        ? const <String>[]
+        : rawCats.map((value) => value.toString()).toList();
     final rawLogo = d['logoUrl'] as String?;
     DateTime? toDate(dynamic v) {
       if (v is Timestamp) return v.toDate();
@@ -170,6 +178,7 @@ class Store {
         d['cardLayout'] as String?,
       ),
       isEnabled: d['isEnabled'] is bool ? d['isEnabled'] as bool : true,
+      categoryIds: categoryIds,
     );
   }
 }

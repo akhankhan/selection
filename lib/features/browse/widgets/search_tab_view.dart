@@ -129,7 +129,7 @@ class _SearchTabViewState extends State<SearchTabView> {
                   textInputAction: TextInputAction.search,
                   onSubmitted: _applySearch,
                   decoration: InputDecoration(
-                    hintText: 'Search deals and stores',
+                    hintText: 'Search restaurants and dishes',
                     prefixIcon: Icon(Icons.search, color: appTheme.subtitle),
                     suffixIcon: hasQuery
                         ? IconButton(
@@ -219,8 +219,8 @@ class _SearchTabViewState extends State<SearchTabView> {
     if (_recentSearches.isEmpty) {
       return EmptyStateView(
         icon: Icons.search,
-        title: 'Search for stores or deals',
-        message: 'Try a store name like Walmart or a product like milk.',
+        title: 'Search for restaurants or dishes',
+        message: 'Try a restaurant name like Pizza Hut or a dish like burger.',
       );
     }
 
@@ -262,7 +262,7 @@ class _SearchTabViewState extends State<SearchTabView> {
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
       children: [
         if (_results.stores.isNotEmpty) ...[
-          _sectionHeader('Stores (${_results.stores.length})'),
+          _sectionHeader('Restaurants (${_results.stores.length})'),
           ..._results.stores.map(_buildStoreTile),
         ],
         if (_results.deals.isNotEmpty) ...[

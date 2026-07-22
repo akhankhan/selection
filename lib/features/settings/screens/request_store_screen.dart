@@ -156,7 +156,7 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         title: const Text(
-          'Request a Store',
+          'Request a Restaurant',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         bottom: PreferredSize(
@@ -195,7 +195,7 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Missing your favorite store?',
+                            'Missing your favorite restaurant?',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
@@ -206,7 +206,7 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Let us know which local retailer flyers you\'d like to see, and we\'ll do our best to onboard them!',
+                            'Tell us which local restaurant menus you\'d like for pickup, and we\'ll do our best to onboard them!',
                             style: TextStyle(
                               fontSize: 13,
                               color: isDark
@@ -225,7 +225,7 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
 
               // Store Name
               Text(
-                'Store Name *',
+                'Restaurant Name *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -237,12 +237,12 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
                 controller: _storeNameController,
                 validator: (val) {
                   if (val == null || val.trim().isEmpty) {
-                    return 'Please enter the store name';
+                    return 'Please enter the restaurant name';
                   }
                   return null;
                 },
                 decoration: const InputDecoration(
-                  hintText: 'e.g. Sobeys, No Frills, FreshCo',
+                  hintText: 'e.g. Belle Province, Pizza Hut, Tim Hortons',
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 14,
@@ -252,7 +252,7 @@ class _RequestStoreScreenState extends State<RequestStoreScreen> {
               const SizedBox(height: 20),
 
               Text(
-                'Store Location / City *',
+                'Restaurant Location / City *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,

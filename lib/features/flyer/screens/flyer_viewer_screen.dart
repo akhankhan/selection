@@ -692,8 +692,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       height: _tabBarHeight,
       child: Row(
         children: [
-          Expanded(child: _buildTab('Weekly Ad', _Tab.weeklyAd, store)),
-          Expanded(child: _buildTab('Related Ads', _Tab.relatedAds, store)),
+          Expanded(child: _buildTab('Menu', _Tab.weeklyAd, store)),
+          Expanded(child: _buildTab('Related', _Tab.relatedAds, store)),
         ],
       ),
     );
@@ -774,19 +774,15 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
     final int storeCount = _stores.length;
     if (storeCount <= 1) return const SizedBox.shrink();
 
-    final appTheme = context.appTheme;
-
+    // Flipp-style dark pill with light dots.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
-        color: appTheme.cardSurface,
+        color: Colors.black.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(24),
-        border: context.isDarkMode
-            ? Border.all(color: appTheme.border.withValues(alpha: 0.6))
-            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: context.isDarkMode ? 0.45 : 0.12),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -799,10 +795,12 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             margin: const EdgeInsets.symmetric(horizontal: 4),
-            width: 8,
-            height: 8,
+            width: active ? 9 : 8,
+            height: active ? 9 : 8,
             decoration: BoxDecoration(
-              color: active ? _activeStore.brandColor : const Color(0xFFD0D5DC),
+              color: active
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.35),
               shape: BoxShape.circle,
             ),
           );
@@ -857,6 +855,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
       appBar: AppBar(
         backgroundColor: appBarTheme.backgroundColor,
         foregroundColor: appBarTheme.foregroundColor,
+        systemOverlayStyle: appBarTheme.systemOverlayStyle,
         elevation: 0,
         scrolledUnderElevation: 0,
         toolbarHeight: 52,
@@ -866,47 +865,35 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.share_outlined, color: iconColor.withValues(alpha: 0.7)),
+            icon: Icon(Icons.share_outlined, color: iconColor),
             onPressed: _shareStore,
           ),
-          if (listCount > 0)
-            Badge(
-              label: Text('$listCount'),
-              backgroundColor: Colors.red,
-              offset: const Offset(-4, 4),
-              child: IconButton(
-                icon: Icon(
-                  Icons.calendar_today_outlined,
-                  color: iconColor.withValues(alpha: 0.7),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ListsScreen()),
-                  );
-                },
-              ),
-            )
-          else
-            IconButton(
+          Badge(
+            isLabelVisible: listCount > 0,
+            label: Text('$listCount'),
+            backgroundColor: const Color(0xFFE5533D),
+            offset: const Offset(-4, 4),
+            child: IconButton(
               icon: Icon(
                 Icons.calendar_today_outlined,
-                color: iconColor.withValues(alpha: 0.7),
+                color: iconColor,
               ),
               onPressed: () {
-                Navigator.of(
-                  context,
-                ).push(MaterialPageRoute(builder: (_) => const ListsScreen()));
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ListsScreen()),
+                );
               },
             ),
+          ),
           IconButton(
             icon: Icon(
               isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: Colors.red,
+              color: isFavorite ? const Color(0xFFE5533D) : iconColor,
             ),
             onPressed: _toggleFavorite,
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert, color: iconColor.withValues(alpha: 0.7)),
+            icon: Icon(Icons.more_vert, color: iconColor),
             onSelected: (value) {
               switch (value) {
                 case 'share':
@@ -920,7 +907,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             itemBuilder: (context) => [
               const PopupMenuItem(
                 value: 'share',
-                child: Text('Share flyer'),
+                child: Text('Share menu'),
               ),
               PopupMenuItem(
                 value: 'favorite',
@@ -928,7 +915,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
               ),
               const PopupMenuItem(
                 value: 'info',
-                child: Text('Store info'),
+                child: Text('Restaurant info'),
               ),
             ],
           ),
@@ -936,27 +923,37 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(64),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             child: Row(
               children: [
                 StoreLogoAvatar(store: store, radius: 20, fontSize: 18),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      store.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: appTheme.navyText,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        store.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 19,
+                          color: appTheme.navyText,
+                        ),
                       ),
-                    ),
-                    Text(
-                      store.dateRange,
-                      style: TextStyle(fontSize: 13, color: appTheme.subtitle),
-                    ),
-                  ],
+                      Text(
+                        store.dateRange,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: appTheme.subtitle,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1025,25 +1022,29 @@ class _FlyerPageTileState extends State<_FlyerPageTile> {
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: GestureDetector(
-        onTapUp: widget.onTapUp,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: widget.page.imageUrl.isEmpty
-                  ? ColoredBox(color: context.appTheme.sectionBg)
-                  : RepaintBoundary(
-                      child: ProgressiveFlyerImage(
-                        imageUrl: widget.page.imageUrl,
-                        previewImageUrl: widget.page.previewImageUrl,
-                        renderWidth: widget.targetW,
-                        fit: BoxFit.fill,
-                        onImageReady: _onImageReady,
+      child: InteractiveViewer(
+        minScale: 1,
+        maxScale: 4,
+        child: GestureDetector(
+          onTapUp: widget.onTapUp,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: widget.page.imageUrl.isEmpty
+                    ? ColoredBox(color: context.appTheme.sectionBg)
+                    : RepaintBoundary(
+                        child: ProgressiveFlyerImage(
+                          imageUrl: widget.page.imageUrl,
+                          previewImageUrl: widget.page.previewImageUrl,
+                          renderWidth: widget.targetW,
+                          fit: BoxFit.fill,
+                          onImageReady: _onImageReady,
+                        ),
                       ),
-                    ),
-            ),
-            if (_imageLoaded) ...widget.highlights,
-          ],
+              ),
+              if (_imageLoaded) ...widget.highlights,
+            ],
+          ),
         ),
       ),
     );

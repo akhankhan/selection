@@ -1,111 +1,128 @@
 import '../../flyer/models/store.dart';
 
+/// Food / restaurant category matching for browse + search filters.
 class StoreCategoryMatcher {
   StoreCategoryMatcher._();
 
+  /// Active food categories shown in search filters and as browse fallbacks.
   static const searchCategories = [
-    'Groceries',
-    'Restaurants',
-    'Home & Garden',
-    'Pharmacy',
-    'General Merchandise',
-    'Electronics',
-    'Automotive',
-    'Pets',
-    'Office',
-    'Specialty',
+    'Burgers',
+    'Pizza',
+    'Asian',
+    'Mexican',
+    'Indian',
+    'Cafe',
+    'Chicken',
+    'Desserts',
+    'Seafood',
+    'Healthy',
   ];
 
-  static bool matchesCategory(Store store, String category) {
+  // --- Legacy non-food categories (kept for reference; not shown in UI) ---
+  // static const legacySearchCategories = [
+  //   'Groceries',
+  //   'Restaurants',
+  //   'Home & Garden',
+  //   'Pharmacy',
+  //   'General Merchandise',
+  //   'Electronics',
+  //   'Automotive',
+  //   'Pets',
+  //   'Office',
+  //   'Specialty',
+  // ];
+
+  /// Prefer Firestore [Store.categoryIds] when set; otherwise name keywords.
+  static bool matchesCategory(
+    Store store,
+    String category, {
+    String? categoryId,
+  }) {
+    if (categoryId != null &&
+        categoryId.isNotEmpty &&
+        store.categoryIds.isNotEmpty) {
+      return store.categoryIds.contains(categoryId);
+    }
+
     final name = store.name.toLowerCase();
     final key = category.toLowerCase();
 
     switch (key) {
-      case 'groceries':
-        return name.contains('grocer') ||
-            name.contains('market') ||
-            name.contains('supermarket') ||
-            name.contains('food') ||
-            name.contains('metro') ||
-            name.contains('sobeys') ||
-            name.contains('loblaw') ||
-            name.contains('costco') ||
-            name.contains('safeway') ||
-            name.contains('freshco') ||
-            name.contains('no frills') ||
-            name.contains('real canadian superstore') ||
-            name.contains('walmart') ||
-            name.contains('iga');
-      case 'restaurants':
-        return name.contains('restaurant') ||
+      case 'burgers':
+        return name.contains('burger') ||
             name.contains('mcdonald') ||
-            name.contains('burger') ||
-            name.contains('pizza') ||
-            name.contains('subway') ||
-            name.contains('kfc') ||
-            name.contains('tim hortons') ||
-            name.contains('starbucks') ||
             name.contains('wendy') ||
-            name.contains('taco');
-      case 'home & garden':
-        return name.contains('home') ||
-            name.contains('garden') ||
-            name.contains('depot') ||
-            name.contains('lowe') ||
-            name.contains('ikea') ||
-            name.contains('canadian tire') ||
-            name.contains('hardware') ||
-            name.contains('bed bath') ||
-            name.contains('renodepot') ||
-            name.contains('rona');
-      case 'pharmacy':
-        return name.contains('pharmacy') ||
-            name.contains('drug') ||
-            name.contains('shoppers') ||
-            name.contains('rexall') ||
-            name.contains('pharma') ||
-            name.contains('health') ||
-            name.contains('london drugs');
-      case 'general merchandise':
-        return name.contains('walmart') ||
-            name.contains('costco') ||
-            name.contains('target') ||
-            name.contains('dollarama') ||
-            name.contains('giant tiger') ||
-            name.contains('marshalls') ||
-            name.contains('winners');
-      case 'electronics':
-        return name.contains('electronic') ||
-            name.contains('best buy') ||
-            name.contains('apple') ||
-            name.contains('source') ||
-            name.contains('staples') ||
-            name.contains('cell') ||
-            name.contains('tbooster');
-      case 'automotive':
-        return name.contains('auto') ||
-            name.contains('tire') ||
-            name.contains('canadian tire') ||
-            name.contains('part') ||
-            name.contains('garage') ||
-            name.contains('napa');
-      case 'pets':
-        return name.contains('pet') ||
-            name.contains('animal') ||
-            name.contains('dog') ||
-            name.contains('cat') ||
-            name.contains('petsmart') ||
-            name.contains('pet valu');
-      case 'office':
-        return name.contains('office') ||
-            name.contains('staples') ||
-            name.contains('depot') ||
-            name.contains('ink') ||
-            name.contains('paper');
-      case 'specialty':
-        return !matchesCategory(store, 'Groceries') &&
-            !name.contains('walmart') &&
-            !name.contains('restaurant');
+            name.contains('a&w') ||
+            name.contains('harvey') ||
+            name.contains('five guys');
+      case 'pizza':
+        return name.contains('pizza') ||
+            name.contains('domino') ||
+            name.contains('papa john') ||
+            name.contains('pizza hut') ||
+            name.contains('pizzaiolo');
+      case 'asian':
+        return name.contains('asian') ||
+            name.contains('chinese') ||
+            name.contains('thai') ||
+            name.contains('sushi') ||
+            name.contains('japanese') ||
+            name.contains('korean') ||
+            name.contains('vietnamese') ||
+            name.contains('pho') ||
+            name.contains('ramen');
+      case 'mexican':
+        return name.contains('mexican') ||
+            name.contains('taco') ||
+            name.contains('burrito') ||
+            name.contains('chipotle') ||
+            name.contains('quesadilla');
+      case 'indian':
+        return name.contains('indian') ||
+            name.contains('curry') ||
+            name.contains('tandoor') ||
+            name.contains('biryani') ||
+            name.contains('naan');
+      case 'cafe':
+        return name.contains('cafe') ||
+            name.contains('café') ||
+            name.contains('coffee') ||
+            name.contains('starbucks') ||
+            name.contains('tim hortons') ||
+            name.contains('bakery') ||
+            name.contains('espresso');
+      case 'chicken':
+        return name.contains('chicken') ||
+            name.contains('kfc') ||
+            name.contains('popeye') ||
+            name.contains('wing') ||
+            name.contains('fried chicken');
+      case 'desserts':
+        return name.contains('dessert') ||
+            name.contains('ice cream') ||
+            name.contains('gelato') ||
+            name.contains('donut') ||
+            name.contains('doughnut') ||
+            name.contains('cake') ||
+            name.contains('sweet');
+      case 'seafood':
+        return name.contains('seafood') ||
+            name.contains('fish') ||
+            name.contains('sushi') ||
+            name.contains('lobster') ||
+            name.contains('shrimp') ||
+            name.contains('oyster');
+      case 'healthy':
+        return name.contains('healthy') ||
+            name.contains('salad') ||
+            name.contains('vegan') ||
+            name.contains('vegetarian') ||
+            name.contains('juice') ||
+            name.contains('bowl') ||
+            name.contains('organic');
+      // Legacy grocery/non-food matchers (commented — no longer used in UI):
+      // case 'groceries': ...
+      // case 'pharmacy': ...
       default:
         return true;
     }

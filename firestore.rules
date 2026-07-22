@@ -114,6 +114,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /menu_categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /home_ads/{adId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /notification_broadcasts/{broadcastId} {
       allow read: if resource.data.status == 'sent' || isAdmin();
       allow create, update, delete: if isAdmin();

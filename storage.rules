@@ -24,5 +24,15 @@ service firebase.storage {
       allow read: if true;
       allow write: if isAuthorizedAdmin();
     }
+
+    match /menu_categories/{categoryId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthorizedAdmin();
+    }
+
+    match /home_ads/{adId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAuthorizedAdmin();
+    }
   }
 }
