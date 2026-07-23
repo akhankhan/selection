@@ -74,6 +74,9 @@ class Store {
   /// Firestore `menu_categories` doc ids assigned in admin.
   final List<String> categoryIds;
 
+  /// Restaurant phone for pickup orders (dialer only — no in-app checkout).
+  final String? phone;
+
   bool get isFeatured => cardLayout == StoreCardLayout.featured;
 
   /// At least one flyer page with an image — required to show in the app.
@@ -141,6 +144,7 @@ class Store {
     this.cardLayout = StoreCardLayout.standard,
     this.isEnabled = true,
     this.categoryIds = const [],
+    this.phone,
   });
 
   factory Store.fromDoc(
@@ -157,6 +161,7 @@ class Store {
         ? const <String>[]
         : rawCats.map((value) => value.toString()).toList();
     final rawLogo = d['logoUrl'] as String?;
+    final rawPhone = (d['phone'] as String?)?.trim();
     DateTime? toDate(dynamic v) {
       if (v is Timestamp) return v.toDate();
       if (v is DateTime) return v;
@@ -179,6 +184,7 @@ class Store {
       ),
       isEnabled: d['isEnabled'] is bool ? d['isEnabled'] as bool : true,
       categoryIds: categoryIds,
+      phone: rawPhone == null || rawPhone.isEmpty ? null : rawPhone,
     );
   }
 }

@@ -9,6 +9,7 @@ import '../widgets/deal_sheet.dart';
 import '../widgets/progressive_flyer_image.dart';
 import '../../../core/storage/favorites_store.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/utils/phone_launcher.dart';
 import '../../lists/screens/lists_screen.dart';
 import '../../lists/models/shopping_list_manager.dart';
 import '../../browse/widgets/store_logo_avatar.dart';
@@ -307,12 +308,21 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   Future<void> _shareStore() async {
     final store = _activeStore;
     final trimmedDates = store.dateRange.trim();
-    final buffer = StringBuffer()..write('${store.name} weekly ad');
+    final buffer = StringBuffer()..write('${store.name} menu');
     if (trimmedDates.isNotEmpty) {
       buffer.write(' ($trimmedDates)');
     }
-    buffer.write('\nBrowse deals in MENU2GO.');
+    buffer.write('\nCall to place a pickup order in MENU2GO.');
     await SharePlus.instance.share(ShareParams(text: buffer.toString()));
+  }
+
+  Future<void> _callRestaurant() {
+    final store = _activeStore;
+    return PhoneLauncher.callForPickup(
+      context,
+      phone: store.phone,
+      restaurantName: store.name,
+    );
   }
 
   void _toggleFavorite() {
@@ -322,19 +332,34 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
   void _showStoreInfo() {
     final store = _activeStore;
     final appTheme = context.appTheme;
+    final phone = store.phone?.trim();
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(store.name),
         content: Text(
-          'Weekly ad valid ${store.dateRange}.\n\n'
-          '${store.pages.length} page${store.pages.length == 1 ? '' : 's'} available.',
+          [
+            if (store.dateRange.trim().isNotEmpty)
+              'Menu valid ${store.dateRange.trim()}.',
+            '${store.pages.length} page${store.pages.length == 1 ? '' : 's'} available.',
+            if (phone != null && phone.isNotEmpty) 'Phone: $phone',
+            '',
+            'No delivery or checkout in the app — call to place a pickup order.',
+          ].join('\n'),
           style: TextStyle(color: appTheme.navyText, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _callRestaurant();
+            },
+            icon: const Icon(Icons.phone, size: 18),
+            label: const Text('Call for pickup'),
           ),
         ],
       ),
@@ -834,6 +859,7 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           storeDateRange: activeStore.dateRange,
           storeLogoLetter: activeStore.logoLetter,
           storeBrandColor: activeStore.brandColor,
+          storePhone: activeStore.phone,
         ),
       ),
     );
@@ -864,6 +890,11 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           onPressed: () => Navigator.maybePop(context),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Call for pickup',
+            icon: Icon(Icons.phone_outlined, color: iconColor),
+            onPressed: _callRestaurant,
+          ),
           IconButton(
             icon: Icon(Icons.share_outlined, color: iconColor),
             onPressed: _shareStore,
@@ -896,6 +927,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
             icon: Icon(Icons.more_vert, color: iconColor),
             onSelected: (value) {
               switch (value) {
+                case 'call':
+                  _callRestaurant();
                 case 'share':
                   _shareStore();
                 case 'favorite':
@@ -905,6 +938,10 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'call',
+                child: Text('Call for pickup'),
+              ),
               const PopupMenuItem(
                 value: 'share',
                 child: Text('Share menu'),
@@ -966,7 +1003,8 @@ class _FlyerViewerScreenState extends State<FlyerViewerScreen>
           Positioned(
             left: 0,
             right: 0,
-            bottom: 16,
+            // Sit above the system nav bar / gesture inset (and Genymotion watermark).
+            bottom: MediaQuery.paddingOf(context).bottom + 16,
             child: Center(child: _buildDotPill()),
           ),
         ],

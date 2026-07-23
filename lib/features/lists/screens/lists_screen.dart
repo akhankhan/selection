@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 
 import '../../../core/navigation/app_navigator.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/utils/phone_launcher.dart';
 import '../../../core/widgets/empty_state_view.dart';
+import '../../flyer/data/flyer_repository.dart';
+import '../../flyer/models/store.dart';
 import '../../settings/widgets/sign_in_required_gate.dart';
 import '../models/list_item.dart';
 import '../models/shopping_list_manager.dart';
@@ -24,7 +27,12 @@ class _ListsScreenState extends State<ListsScreen> {
   final ShoppingListManager _manager = ShoppingListManager();
   final GlobalKey<AddItemInputState> _addItemKey = GlobalKey();
   StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<List<Store>>? _storesSubscription;
+  /// Lowercased store name → phone
+  Map<String, String> _phonesByStoreName = {};
   bool _showAddItemBar = false;
+
+  static const String _myListTitle = 'My List';
 
   @override
   void initState() {
@@ -38,11 +46,23 @@ class _ListsScreenState extends State<ListsScreen> {
       }
       if (mounted) setState(() {});
     });
+    _storesSubscription =
+        FlyerRepository.instance.watchStores().listen((stores) {
+      if (!mounted) return;
+      setState(() {
+        _phonesByStoreName = {
+          for (final s in stores)
+            if (s.phone != null && s.phone!.trim().isNotEmpty)
+              s.name.trim().toLowerCase(): s.phone!.trim(),
+        };
+      });
+    });
   }
 
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _storesSubscription?.cancel();
     _manager.removeListener(_onManagerUpdate);
     super.dispose();
   }
@@ -312,7 +332,7 @@ class _ListsScreenState extends State<ListsScreen> {
                       icon: Icons.checklist_rtl_outlined,
                       title: 'Your list is empty',
                       message:
-                          'Clip deals from flyers or tap Add Item to start your shopping list.',
+                          'Circle menu items or tap Add Item. Then call the restaurant to place a pickup order.',
                       actionLabel: 'Add first item',
                       onAction: () => _openAddItem(),
                     )
@@ -338,10 +358,21 @@ class _ListsScreenState extends State<ListsScreen> {
   }
 
   List<Widget> _buildSection(ListSection section) {
+    final isMyList = section.title == _myListTitle;
+    final phone = isMyList
+        ? null
+        : _phonesByStoreName[section.title.trim().toLowerCase()];
     return [
       _SectionHeader(
         title: section.title,
+        phone: phone,
+        showCall: !isMyList,
         onAdd: () => _openAddItem(section.title),
+        onCall: () => PhoneLauncher.callForPickup(
+          context,
+          phone: phone,
+          restaurantName: section.title,
+        ),
       ),
       if (section.items.isEmpty)
         Padding(
@@ -367,10 +398,19 @@ class _ListsScreenState extends State<ListsScreen> {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.onAdd});
+  const _SectionHeader({
+    required this.title,
+    required this.onAdd,
+    required this.onCall,
+    required this.showCall,
+    this.phone,
+  });
 
   final String title;
   final VoidCallback onAdd;
+  final VoidCallback onCall;
+  final bool showCall;
+  final String? phone;
 
   @override
   Widget build(BuildContext context) {
@@ -385,29 +425,58 @@ class _SectionHeader extends StatelessWidget {
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: theme.navyText,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: theme.navyText,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onAdd,
+                child: Text(
+                  'Add Item',
+                  style: TextStyle(
+                    color: context.brandBlue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (showCall) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onCall,
+                icon: const Icon(Icons.phone, size: 18),
+                label: Text(
+                  phone == null || phone!.isEmpty
+                      ? 'Call for pickup'
+                      : 'Call for pickup · $phone',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.brandBlue,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
               ),
             ),
-          ),
-          GestureDetector(
-            onTap: onAdd,
-            child: Text(
-              'Add Item',
-              style: TextStyle(
-                color: context.brandBlue,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
-            ),
-          ),
+          ],
         ],
       ),
     );

@@ -47,6 +47,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tel</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow camera access to take a profile picture.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

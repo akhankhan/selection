@@ -2,15 +2,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_theme_extension.dart';
+import '../../../core/utils/phone_launcher.dart';
 import '../models/flyer_item.dart';
 import 'product_thumbnail.dart';
 
 /// Expandable bottom sheet for a flyer deal.
 ///
 /// Opens as a compact peek (photo + name + price) and can be dragged up — or
-/// the chevron tapped — to reveal the full detail view: large photo, who it is
-/// sold by, validity, description, SKU and terms. The action buttons stay
-/// pinned at the bottom in both states.
+/// the chevron tapped — to reveal pickup details. Action buttons stay pinned:
+/// call the restaurant for pickup, or share the item.
 class DealSheet extends StatefulWidget {
   final FlyerItem item;
 
@@ -21,6 +21,7 @@ class DealSheet extends StatefulWidget {
   final String storeDateRange;
   final String storeLogoLetter;
   final Color storeBrandColor;
+  final String? storePhone;
 
   /// Open already expanded to the full detail view instead of the peek.
   final bool startExpanded;
@@ -33,6 +34,7 @@ class DealSheet extends StatefulWidget {
     required this.storeDateRange,
     required this.storeLogoLetter,
     required this.storeBrandColor,
+    this.storePhone,
     this.startExpanded = false,
   });
 
@@ -50,8 +52,6 @@ class _DealSheetState extends State<DealSheet> {
     if (screenHeight <= 0) return 0.23;
     final double bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    // Standard compact content heights: 24 (handle) + 72 (image) + 16 (padding) + 60 (buttons) = 172
-    // If the product title is long and wraps to 2 lines, we add a 16dp buffer.
     final double titleBuffer = widget.item.name.length > 20 ? 16.0 : 0.0;
     final double targetHeight = 172.0 + titleBuffer + bottomPadding;
 
@@ -61,7 +61,6 @@ class _DealSheetState extends State<DealSheet> {
   final DraggableScrollableController _controller =
       DraggableScrollableController();
   bool _expanded = false;
-  bool _showComingSoonMessage = false;
 
   @override
   void initState() {
@@ -92,11 +91,12 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-  void _buyNow() {
-    setState(() => _showComingSoonMessage = true);
-    Future<void>.delayed(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _showComingSoonMessage = false);
-    });
+  Future<void> _callForPickup() {
+    return PhoneLauncher.callForPickup(
+      context,
+      phone: widget.storePhone,
+      restaurantName: widget.storeName,
+    );
   }
 
   Future<void> _shareDeal() async {
@@ -106,7 +106,7 @@ class _DealSheetState extends State<DealSheet> {
     if (trimmedDates.isNotEmpty) {
       buffer.write('\nValid $trimmedDates');
     }
-    buffer.write('\nBrowse deals in MENU2GO.');
+    buffer.write('\nCall to place a pickup order in MENU2GO.');
     await SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }
 
@@ -126,7 +126,6 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-  /// Normalised region of the flyer holding just this item's product photo.
   Rect get _photoCrop {
     final Rect b = widget.item.boundingBox;
     return Rect.fromLTRB(
@@ -157,7 +156,9 @@ class _DealSheetState extends State<DealSheet> {
             boxShadow: [
               BoxShadow(
                 blurRadius: 24,
-                color: Colors.black.withValues(alpha: context.isDarkMode ? 0.55 : 0.15),
+                color: Colors.black.withValues(
+                  alpha: context.isDarkMode ? 0.55 : 0.15,
+                ),
               ),
             ],
           ),
@@ -182,13 +183,6 @@ class _DealSheetState extends State<DealSheet> {
                     ),
                   ],
                 ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                child: _showComingSoonMessage
-                    ? _buildComingSoonBanner()
-                    : const SizedBox.shrink(),
               ),
               _buildButtons(context),
             ],
@@ -221,7 +215,6 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-  /// Compact peek: photo on the left, name + price on the right.
   Widget _buildCompact() {
     final FlyerItem item = widget.item;
     final textColor = context.appTheme.navyText;
@@ -271,21 +264,12 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-  /// Full detail view shown when the sheet is expanded.
   Widget _buildExpanded() {
     final FlyerItem item = widget.item;
     final appTheme = context.appTheme;
     final textColor = appTheme.navyText;
     final subtitleColor = appTheme.subtitle;
     final dividerColor = Theme.of(context).dividerColor;
-    // Demo detail content matching the screenshot structure:
-    final String sku = item.id.hashCode
-        .abs()
-        .toString()
-        .padRight(13, '0')
-        .substring(0, 13);
-    final String productCode = (item.id.hashCode.abs() % 9000000 + 1000000)
-        .toString();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,7 +335,7 @@ class _DealSheetState extends State<DealSheet> {
                       TextSpan(
                         style: TextStyle(fontSize: 14, color: textColor),
                         children: [
-                          const TextSpan(text: 'Sold and fulfilled by '),
+                          const TextSpan(text: 'Pickup at '),
                           TextSpan(
                             text: widget.storeName,
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -373,18 +357,19 @@ class _DealSheetState extends State<DealSheet> {
             ],
           ),
         ),
-        _sectionHeader('Description'),
-        _bodyText('Pack. Product of USA or Mexico.\n#$productCode.'),
+        _sectionHeader('How to order'),
+        _bodyText(
+          'No delivery or checkout in the app. Circle items into your list, '
+          'then call ${widget.storeName} to place a pickup order.',
+        ),
         Divider(height: 1, color: dividerColor, thickness: 1),
-        _bodyText('SKU: $sku'),
-        const SizedBox(height: 10),
-        _sectionHeader('Terms and conditions'),
+        _sectionHeader('Restaurant policies'),
         _linkRow(
-          'Shipping policy',
+          'Pickup info',
           onTap: () => _showPolicyDialog(
-            'Shipping policy',
-            'Standard shipping rates apply for online orders from '
-            '${widget.storeName}. Delivery times vary by location.',
+            'Pickup info',
+            'Orders are placed by phone and picked up at ${widget.storeName}. '
+            'Confirm item availability, pricing, and pickup time when you call.',
           ),
         ),
         Divider(height: 1, color: dividerColor, thickness: 1),
@@ -392,16 +377,15 @@ class _DealSheetState extends State<DealSheet> {
           'Return policy',
           onTap: () => _showPolicyDialog(
             'Return policy',
-            'Returns must be made within the store return window. '
-            'Keep your receipt and follow ${widget.storeName} return guidelines.',
+            'Returns follow ${widget.storeName} guidelines. '
+            'Ask when you call or pick up.',
           ),
         ),
         Divider(height: 1, color: dividerColor, thickness: 1),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Text(
-            'In the event of a disagreement between the flyer and this popup, '
-            'the flyers shall take precedence',
+            'Menu prices may change. Confirm with the restaurant when you call.',
             style: TextStyle(fontSize: 12.5, color: subtitleColor, height: 1.4),
           ),
         ),
@@ -420,8 +404,9 @@ class _DealSheetState extends State<DealSheet> {
         title,
         style: TextStyle(
           fontWeight: FontWeight.bold,
-          fontSize: 14,
+          fontSize: 13,
           color: appTheme.navyText,
+          letterSpacing: 0.2,
         ),
       ),
     );
@@ -459,37 +444,6 @@ class _DealSheetState extends State<DealSheet> {
     );
   }
 
-  Widget _buildComingSoonBanner() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: _brandBlue.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _brandBlue.withValues(alpha: 0.35)),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.info_outline, color: _brandBlue, size: 20),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'This feature is coming soon.',
-                style: TextStyle(
-                  color: _brandBlue,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildButtons(BuildContext context) {
     final appTheme = context.appTheme;
 
@@ -510,16 +464,20 @@ class _DealSheetState extends State<DealSheet> {
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _buyNow,
-              icon: const Icon(Icons.storefront_outlined, size: 20),
+            child: ElevatedButton.icon(
+              onPressed: _callForPickup,
+              icon: const Icon(Icons.phone, color: Colors.white, size: 20),
               label: const Text(
-                'Buy Now',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                'Call for pickup',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: _brandBlue,
-                side: const BorderSide(color: _brandBlue, width: 1.8),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _brandBlue,
+                elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -529,20 +487,16 @@ class _DealSheetState extends State<DealSheet> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: ElevatedButton.icon(
+            child: OutlinedButton.icon(
               onPressed: _shareDeal,
-              icon: const Icon(Icons.share, color: Colors.white, size: 20),
+              icon: const Icon(Icons.share, size: 20),
               label: const Text(
-                'Share deal',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                'Share',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _brandBlue,
-                elevation: 0,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _brandBlue,
+                side: const BorderSide(color: _brandBlue, width: 1.8),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

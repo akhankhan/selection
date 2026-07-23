@@ -10,7 +10,7 @@ class ShoppingListShareService {
       return 'My MENU2GO shopping list is empty.';
     }
 
-    final buffer = StringBuffer('My MENU2GO shopping list\n\n');
+    final buffer = StringBuffer('My MENU2GO pickup list\n\n');
     for (final section in manager.sections) {
       if (section.items.isEmpty) continue;
       buffer.writeln('${section.title}:');
@@ -22,7 +22,7 @@ class ShoppingListShareService {
       }
       buffer.writeln();
     }
-    buffer.writeln('Shared from MENU2GO');
+    buffer.writeln('Call the restaurant to place a pickup order. Shared from MENU2GO');
     return buffer.toString().trim();
   }
 
